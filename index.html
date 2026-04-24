@@ -413,6 +413,21 @@ select{background:var(--sur);color:var(--text);border:0.5px solid var(--bor);bor
 .sett-tbl td{padding:10px 0;border-bottom:0.5px solid var(--bor)}
 .sett-tbl td:first-child{color:var(--mut);width:120px}
 
+/* ── SYNC INFO BAR ── */
+.sync-bar{display:flex;align-items:center;gap:16px;padding:8px 22px;background:var(--sur2);border-bottom:0.5px solid var(--bor);font-size:11px;color:var(--mut);flex-wrap:wrap}
+.sync-item{display:flex;align-items:center;gap:6px}
+.sync-dot{width:6px;height:6px;border-radius:50%;background:var(--grn);display:inline-block;animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+.sync-label{color:var(--mut)}
+.sync-value{color:var(--text);font-weight:500}
+.sync-value.stale{color:var(--amb)}
+.sync-value.ok{color:var(--grn)}
+
+/* ── SPRINT PROGRESS — Active Day Dot ── */
+.dp{position:relative}
+.dp.active-day{background:var(--acc) !important;color:#fff !important;opacity:1 !important;box-shadow:0 0 0 2px rgba(91,110,245,.2);font-weight:600}
+.dp.active-day::after{content:'';position:absolute;top:-3px;right:-3px;width:8px;height:8px;border-radius:50%;background:var(--red);border:2px solid var(--sur);box-shadow:0 0 4px rgba(240,82,82,.6);animation:pulse 2s infinite}
+
 @media(max-width:720px){
   .krow{grid-template-columns:repeat(2,1fr)}
   .tp-grid{grid-template-columns:repeat(2,1fr)}
@@ -494,6 +509,22 @@ select{background:var(--sur);color:var(--text);border:0.5px solid var(--bor);bor
       </div>
     </div>
 
+    <div class="sync-bar" id="syncBar">
+      <div class="sync-item">
+        <span class="sync-dot"></span>
+        <span class="sync-label">Dashboard loaded:</span>
+        <span class="sync-value" id="syncLoadTime">—</span>
+      </div>
+      <div class="sync-item">
+        <span class="sync-label">Sheet last synced:</span>
+        <span class="sync-value" id="syncSheetTime">—</span>
+      </div>
+      <div class="sync-item">
+        <span class="sync-label">Next auto-sync:</span>
+        <span class="sync-value" id="syncNextTime">—</span>
+      </div>
+    </div>
+
     <div class="page-content" id="mc">
       <div class="loading"><div class="spin"></div><p>Loading data from Google Sheets...</p></div>
     </div>
@@ -537,7 +568,7 @@ select{background:var(--sur);color:var(--text);border:0.5px solid var(--bor);bor
 </div>
 
 <script>
-var API='https://script.google.com/macros/s/AKfycbzoPw7JeE4kAyjzFusMxhQgdm62ja1hCi_luov7U3egdEoG7yiceuA9DSmxmELASs9QvQ/exec';
+var API='https://script.google.com/macros/s/AKfycbxLnHe5-F1JWcovwVmRAbJ6ll-pdP1kdhHkBIKRorPBauDHDg7knEKVRC5wSUUfOOypAw/exec';
 var CH={},isDark=true,raw=null,cur=null,curTeam='All',curIndvTeam='All';
 var TC=['#5b6ef5','#18c97a','#9b72f5','#f5a623','#f05252','#22c4c4','#0aaa62'];
 var TEAM_COLORS={};
@@ -849,7 +880,7 @@ function render(d){
   // Show Users page only for Admin
   var usersNav = document.getElementById('nav-users');
   if(usersNav){
-    if(window._userRole === 'Admin') usersNav.removeAttribute('data-hidden');
+    if((window._userRole||'').toLowerCase() === 'admin') usersNav.removeAttribute('data-hidden');
     else usersNav.setAttribute('data-hidden', '1');
   }
   // Render subtasks data (used across pages)
@@ -1005,31 +1036,57 @@ function doProgress(d){
   document.getElementById('spH').textContent=d.dDone+' of '+d.dTot+' days elapsed · '+rem+' days to go';
 
   // Day badges: D0 (planning, excluded) + D1..Dn (working days)
+  // Active day gets solid color + red dot indicator (not fade)
   var cells='<div class="dp" style="background:var(--sur2);color:var(--mut);border:1px dashed var(--bor);font-style:italic" title="Planning day (excluded)">D0</div>';
   for(var i=1;i<=Math.min(d.dTot,30);i++){
-    // Day i is "past" when dDone >= i, "today" when dDone === i-1 (in progress)
     var past=i<=d.dDone, today=i===d.dDone+1 && rem>0;
-    var bg=past?fc:(today?fc:'var(--sur2)');
-    cells+='<div class="dp" style="background:'+bg+';opacity:'+(today?.6:1)+';color:'+((past||today)?'#fff':'var(--mut)')+'">D'+i+'</div>';
+    if(today){
+      // Active day — solid color + red pulsing dot (see CSS .active-day)
+      cells+='<div class="dp active-day" title="Today">D'+i+'</div>';
+    } else {
+      var bg=past?fc:'var(--sur2)';
+      cells+='<div class="dp" style="background:'+bg+';color:'+(past?'#fff':'var(--mut)')+'">D'+i+'</div>';
+    }
   }
   document.getElementById('dRow').innerHTML=cells;
 
-  // Overall progress card + team-wise cards
-  var totDone=d.done||0, totTasks=d.total||1;
-  var overPct=pc(totDone,totTasks);
-  var overCol=overPct>=80?'var(--grn)':(overPct>=50?'var(--amb)':'var(--red)');
-  var overHtml='<div class="tp" style="border:1px solid '+overCol+';background:rgba(155,114,245,.04)">'
-    +'<div class="tp-head"><span class="tp-name" style="font-weight:700;color:var(--text)">Overall</span><span class="tp-pct" style="color:'+overCol+';font-size:14px">'+overPct+'%</span></div>'
-    +'<div class="tp-bar"><div class="tp-fill" style="width:'+overPct+'%;background:'+overCol+'"></div></div>'
-    +'<div class="tp-info">'+totDone+'/'+totTasks+' done · '+rnd(d.totLog||0)+'/'+rnd(d.totEst||0)+' hrs</div></div>';
+  // Team-wise cards — no Overall card, instead totals shown in each team card footer
+  var totEst = rnd(d.totEst||0);
+  var totLog = rnd(d.totLog||0);
+  var totDone = d.done||0, totTasks = d.total||1;
 
-  document.getElementById('tpG').innerHTML=overHtml+d.teams.map(function(t){
+  document.getElementById('tpG').innerHTML = d.teams.map(function(t){
     var tp=pc(t.done,t.tot);
     var col=tp>=80?'var(--grn)':(tp>=50?'var(--amb)':'var(--red)');
     return '<div class="tp"><div class="tp-head"><span class="tp-name">'+t.n+'</span><span class="tp-pct" style="color:'+col+'">'+tp+'%</span></div>'
       +'<div class="tp-bar"><div class="tp-fill" style="width:'+tp+'%;background:'+col+'"></div></div>'
-      +'<div class="tp-info">'+t.done+'/'+t.tot+' done · '+rnd(t.log)+' hrs logged</div></div>';
+      +'<div class="tp-info">'+t.done+'/'+t.tot+' done · '+rnd(t.log||0)+'/'+rnd(t.est||0)+' hrs</div></div>';
   }).join('');
+
+  // ── Sprint totals row below team cards ──
+  var existingTotals = document.getElementById('sprintTotals');
+  if(existingTotals) existingTotals.remove();
+
+  var overPct = pc(totDone, totTasks);
+  var overCol = overPct>=80?'var(--grn)':(overPct>=50?'var(--amb)':'var(--red)');
+  var hrsUtil = totEst > 0 ? Math.round(totLog/totEst*100) : 0;
+
+  var totalsHtml = '<div id="sprintTotals" style="margin-top:14px;padding:14px 16px;background:var(--sur2);border:1px solid var(--bor);border-radius:10px;display:grid;grid-template-columns:repeat(4,1fr);gap:14px;font-size:12px">'
+    + '<div><div style="font-size:10px;color:var(--mut);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">Sprint completion</div>'
+    + '<div style="font-size:18px;font-weight:600;color:'+overCol+'">'+overPct+'%</div>'
+    + '<div style="font-size:10px;color:var(--mut);margin-top:2px">'+totDone+' of '+totTasks+' tasks</div></div>'
+    + '<div><div style="font-size:10px;color:var(--mut);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">Total estimated</div>'
+    + '<div style="font-size:18px;font-weight:600;color:var(--acc)">'+totEst+' hrs</div>'
+    + '<div style="font-size:10px;color:var(--mut);margin-top:2px">planned workload</div></div>'
+    + '<div><div style="font-size:10px;color:var(--mut);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">Total logged</div>'
+    + '<div style="font-size:18px;font-weight:600;color:var(--grn)">'+totLog+' hrs</div>'
+    + '<div style="font-size:10px;color:var(--mut);margin-top:2px">actual work done</div></div>'
+    + '<div><div style="font-size:10px;color:var(--mut);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">Utilization</div>'
+    + '<div style="font-size:18px;font-weight:600;color:'+(hrsUtil>=80?'var(--grn)':hrsUtil>=60?'var(--amb)':'var(--red)')+'">'+hrsUtil+'%</div>'
+    + '<div style="font-size:10px;color:var(--mut);margin-top:2px">log vs estimate</div></div>'
+    + '</div>';
+
+  document.getElementById('tpG').insertAdjacentHTML('afterend', totalsHtml);
 }
 
 /* ── SPRINT GOAL ── */
@@ -2031,7 +2088,7 @@ function doEarly(d){
 // ── USERS PAGE ──
 async function doUsersPage(d){
   var el = document.getElementById('usersPage'); if(!el) return;
-  if(window._userRole !== 'Admin'){
+  if((window._userRole||'').toLowerCase() !== 'admin'){
     el.innerHTML = '<div class="empty">Admin access required to manage users.</div>';
     return;
   }
@@ -2222,6 +2279,71 @@ function setupSidebar(){
   });
 }
 
+// ── SYNC BAR ──
+function updateSyncBar(json){
+  var now = new Date();
+  var loadEl = document.getElementById('syncLoadTime');
+  if(loadEl) loadEl.textContent = now.toLocaleString('en-US', {
+    month:'short', day:'numeric', hour:'2-digit', minute:'2-digit', hour12:true
+  });
+
+  // Sheet last synced — from json.lastSync
+  var sheetEl = document.getElementById('syncSheetTime');
+  if(sheetEl){
+    var lastSync = json && json.lastSync;
+    if(lastSync){
+      sheetEl.textContent = lastSync;
+      // Color by recency
+      try {
+        var lastDate = new Date(lastSync.replace(/(\d+)(st|nd|rd|th)/i,'$1'));
+        var hoursAgo = (now - lastDate) / 3600000;
+        if(hoursAgo < 12) sheetEl.className = 'sync-value ok';
+        else if(hoursAgo < 24) sheetEl.className = 'sync-value';
+        else sheetEl.className = 'sync-value stale';
+      } catch(e){}
+    } else {
+      sheetEl.textContent = 'Never';
+      sheetEl.className = 'sync-value stale';
+    }
+  }
+
+  // Next auto-sync — 8am or 6pm PKT (whichever is next)
+  var nextEl = document.getElementById('syncNextTime');
+  if(nextEl){
+    nextEl.textContent = getNextSyncTime();
+  }
+}
+
+function getNextSyncTime(){
+  // Sync times: 8am PKT and 6pm PKT
+  var now = new Date();
+  // Convert current time to PKT (UTC+5)
+  var utcHours = now.getUTCHours();
+  var utcMinutes = now.getUTCMinutes();
+  var pktHours = (utcHours + 5) % 24;
+  var pktMinutes = utcMinutes;
+
+  var next, diff;
+  if(pktHours < 8 || (pktHours === 8 && pktMinutes === 0)){
+    // Next is 8am today
+    next = '8:00 AM PKT';
+    diff = (8 - pktHours) * 60 - pktMinutes;
+  } else if(pktHours < 18 || (pktHours === 18 && pktMinutes === 0)){
+    // Next is 6pm today
+    next = '6:00 PM PKT';
+    diff = (18 - pktHours) * 60 - pktMinutes;
+  } else {
+    // Next is 8am tomorrow
+    next = '8:00 AM PKT (tomorrow)';
+    diff = (24 - pktHours + 8) * 60 - pktMinutes;
+  }
+
+  var hours = Math.floor(diff / 60);
+  var mins  = diff % 60;
+  var inText = hours > 0 ? (hours + 'h ' + mins + 'm') : (mins + 'm');
+  return next + ' (in ' + inText + ')';
+}
+
 /* ── INIT ── */
 function init(){
   TEAM_COLORS={};
@@ -2229,6 +2351,7 @@ function init(){
   fetchData()
     .then(function(json){
       raw=json;
+      updateSyncBar(json);
       // Only show actual sprints:
       // Valid sprint must have start & end that look like real dates
       // e.g. "30th March 2026" — not empty, not "BACKLOG", not "BUGS"
@@ -2286,7 +2409,7 @@ function showDashboard(name){
   // Hide users nav for non-admin
   var usersNav = document.getElementById('nav-users');
   if(usersNav){
-    if(window._userRole === 'Admin') usersNav.removeAttribute('data-hidden');
+    if((window._userRole||'').toLowerCase() === 'admin') usersNav.removeAttribute('data-hidden');
     else usersNav.setAttribute('data-hidden', '1');
   }
   // Apply saved theme
