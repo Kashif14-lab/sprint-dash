@@ -15,18 +15,18 @@ body{font-family:system-ui,-apple-system,sans-serif;font-size:13px;transition:ba
 .sidebar.collapsed{width:56px}
 .sidebar.collapsed .sb-brand,
 .sidebar.collapsed .sb-group,
-.sidebar.collapsed .sb-item span:not(.sb-icon),
-.sidebar.collapsed .sb-user-info{display:none}
-.sidebar.collapsed .sb-header{justify-content:center;padding:14px 6px}
-.sidebar.collapsed .sb-logo{width:30px;height:30px;font-size:12px}
-.sidebar.collapsed .sb-nav{padding:10px 4px}
-.sidebar.collapsed .sb-item{justify-content:center;padding:9px 6px;margin-bottom:3px}
-.sidebar.collapsed .sb-footer{padding:8px 6px;flex-direction:column;gap:4px;align-items:center}
-.sidebar.collapsed .sb-user{justify-content:center}
-.sidebar.collapsed .sb-avatar{width:30px;height:30px;font-size:12px}
-.sidebar.collapsed .sb-logout{width:32px;height:32px;padding:0}
+.sidebar.collapsed .sb-label,
+.sidebar.collapsed .sb-user-info{display:none !important}
+.sidebar.collapsed .sb-header{justify-content:center;padding:14px 6px;gap:0}
+.sidebar.collapsed .sb-logo{width:32px;height:32px;font-size:12px}
+.sidebar.collapsed .sb-nav{padding:10px 4px;overflow:hidden}
+.sidebar.collapsed .sb-item{justify-content:center;padding:10px 0;margin-bottom:3px;gap:0;width:100%}
+.sidebar.collapsed .sb-icon{font-size:16px;width:20px;margin:0}
+.sidebar.collapsed .sb-footer{padding:8px 0;flex-direction:column;gap:6px;align-items:center;justify-content:center}
+.sidebar.collapsed .sb-user{justify-content:center;gap:0;width:auto;flex:none}
+.sidebar.collapsed .sb-avatar{width:32px;height:32px;font-size:12px;margin:0}
+.sidebar.collapsed .sb-logout{width:32px;height:32px;padding:0;margin:0;display:flex;align-items:center;justify-content:center}
 .sidebar.collapsed .sb-item.on{background:rgba(91,110,245,.18)}
-.sidebar.collapsed .sb-icon{font-size:16px}
 /* Tooltip on hover when collapsed */
 .sidebar.collapsed .sb-item{position:relative}
 .sidebar.collapsed .sb-item:hover::after{
@@ -523,18 +523,18 @@ select{background:var(--sur);color:var(--text);border:0.5px solid var(--bor);bor
 
     <nav class="sb-nav">
       <div class="sb-group">Sprint</div>
-      <a class="sb-item on" data-page="overview" data-label="Overview"><span class="sb-icon">📊</span>Overview</a>
-      <a class="sb-item" data-page="goals" data-label="Goals"><span class="sb-icon">🎯</span>Goals</a>
-      <a class="sb-item" data-page="burndown" data-label="Burndown"><span class="sb-icon">🔥</span>Burndown</a>
-      <a class="sb-item" data-page="team" data-label="Team"><span class="sb-icon">👥</span>Team</a>
-      <a class="sb-item" data-page="bugs" data-label="Bugs"><span class="sb-icon">🐛</span>Bugs</a>
-      <a class="sb-item" data-page="spillovers" data-label="Spillovers"><span class="sb-icon">🔄</span>Spillovers</a>
-      <a class="sb-item" data-page="retro" data-label="Retrospective"><span class="sb-icon">📝</span>Retrospective</a>
-      <a class="sb-item" data-page="performance" data-label="Performance"><span class="sb-icon">🏆</span>Performance</a>
+      <a class="sb-item on" data-page="overview" data-label="Overview"><span class="sb-icon">📊</span><span class="sb-label">Overview</span></a>
+      <a class="sb-item" data-page="goals" data-label="Goals"><span class="sb-icon">🎯</span><span class="sb-label">Goals</span></a>
+      <a class="sb-item" data-page="burndown" data-label="Burndown"><span class="sb-icon">🔥</span><span class="sb-label">Burndown</span></a>
+      <a class="sb-item" data-page="team" data-label="Team"><span class="sb-icon">👥</span><span class="sb-label">Team</span></a>
+      <a class="sb-item" data-page="bugs" data-label="Bugs"><span class="sb-icon">🐛</span><span class="sb-label">Bugs</span></a>
+      <a class="sb-item" data-page="spillovers" data-label="Spillovers"><span class="sb-icon">🔄</span><span class="sb-label">Spillovers</span></a>
+      <a class="sb-item" data-page="retro" data-label="Retrospective"><span class="sb-icon">📝</span><span class="sb-label">Retrospective</span></a>
+      <a class="sb-item" data-page="performance" data-label="Performance"><span class="sb-icon">🏆</span><span class="sb-label">Performance</span></a>
 
       <div class="sb-group">Admin</div>
-      <a class="sb-item" data-page="users" data-label="Users" id="nav-users"><span class="sb-icon">👤</span>Users</a>
-      <a class="sb-item" data-page="settings" data-label="Settings"><span class="sb-icon">⚙️</span>Settings</a>
+      <a class="sb-item" data-page="users" data-label="Users" id="nav-users"><span class="sb-icon">👤</span><span class="sb-label">Users</span></a>
+      <a class="sb-item" data-page="settings" data-label="Settings"><span class="sb-icon">⚙️</span><span class="sb-label">Settings</span></a>
     </nav>
 
     <div class="sb-footer">
@@ -623,7 +623,7 @@ select{background:var(--sur);color:var(--text);border:0.5px solid var(--bor);bor
 </div>
 
 <script>
-var API='https://script.google.com/macros/s/AKfycbyVEEcfTosOeeq42DhczhWxX4IqlGww_jdN1hR-Oiw-LycO3YU1BekP0WLuqqisVJTMJA/exec';
+var API='https://script.google.com/macros/s/AKfycbxLnHe5-F1JWcovwVmRAbJ6ll-pdP1kdhHkBIKRorPBauDHDg7knEKVRC5wSUUfOOypAw/exec';
 var CH={},isDark=true,raw=null,cur=null,curTeam='All',curIndvTeam='All';
 var TC=['#5b6ef5','#18c97a','#9b72f5','#f5a623','#f05252','#22c4c4','#0aaa62'];
 var TEAM_COLORS={};
