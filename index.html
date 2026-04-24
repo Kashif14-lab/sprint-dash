@@ -7,7 +7,63 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
-body{font-family:system-ui,-apple-system,sans-serif;font-size:13px;transition:background .3s,color .3s}
+body{font-family:system-ui,-apple-system,sans-serif;font-size:13px;transition:background .3s,color .3s;margin:0}
+
+/* ── SIDEBAR LAYOUT ── */
+.app-shell{display:flex;min-height:100vh;background:var(--bg)}
+.sidebar{width:240px;background:var(--sur);border-right:0.5px solid var(--bor);display:flex;flex-direction:column;flex-shrink:0;position:sticky;top:0;height:100vh;overflow-y:auto;transition:width .2s,transform .2s}
+.sidebar.collapsed{width:0;overflow:hidden}
+.sb-header{padding:18px 16px;border-bottom:0.5px solid var(--bor);display:flex;align-items:center;gap:10px}
+.sb-logo{width:34px;height:34px;border-radius:8px;background:linear-gradient(135deg,var(--acc),var(--pur));display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:13px;flex-shrink:0}
+.sb-brand{overflow:hidden}
+.sb-title{font-size:13px;font-weight:600;color:var(--text);line-height:1.2}
+.sb-sub{font-size:10px;color:var(--mut);margin-top:2px}
+.sb-nav{flex:1;padding:14px 8px;overflow-y:auto}
+.sb-group{font-size:9px;font-weight:700;color:var(--mut);text-transform:uppercase;letter-spacing:.8px;padding:10px 10px 6px;margin-top:6px}
+.sb-group:first-child{margin-top:0}
+.sb-item{display:flex;align-items:center;gap:10px;padding:8px 12px;border-radius:7px;font-size:12px;color:var(--mut);cursor:pointer;transition:all .12s;margin-bottom:2px;text-decoration:none;font-weight:500}
+.sb-item:hover{background:var(--sur2);color:var(--text)}
+.sb-item.on{background:rgba(91,110,245,.12);color:var(--acc);font-weight:600}
+.sb-item.on .sb-icon{filter:none}
+.sb-icon{font-size:14px;width:18px;text-align:center;opacity:.8}
+.sb-item.on .sb-icon{opacity:1}
+.sb-footer{border-top:0.5px solid var(--bor);padding:10px 12px;display:flex;align-items:center;gap:8px}
+.sb-user{flex:1;display:flex;align-items:center;gap:8px;overflow:hidden}
+.sb-avatar{width:28px;height:28px;border-radius:50%;background:var(--acc);color:#fff;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:600;flex-shrink:0}
+.sb-user-info{overflow:hidden}
+.sb-user-name{font-size:11px;color:var(--text);font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sb-user-role{font-size:9px;color:var(--mut);margin-top:1px}
+.sb-logout{background:transparent;border:0.5px solid var(--bor);color:var(--mut);width:32px;height:32px;border-radius:7px;cursor:pointer;font-size:14px;transition:all .12s}
+.sb-logout:hover{border-color:var(--red);color:var(--red)}
+
+/* Hide Users page link for non-admins */
+.sb-item[data-page="users"][data-hidden="1"]{display:none}
+
+.main-area{flex:1;min-width:0;display:flex;flex-direction:column;background:var(--bg)}
+.main-topbar{display:flex;align-items:center;gap:14px;padding:14px 22px;border-bottom:0.5px solid var(--bor);background:var(--sur);position:sticky;top:0;z-index:10;flex-wrap:wrap}
+.hamburger{background:transparent;border:none;color:var(--mut);font-size:18px;cursor:pointer;padding:4px 10px;border-radius:6px;transition:all .12s}
+.hamburger:hover{background:var(--sur2);color:var(--text)}
+.page-title-wrap{flex:1;min-width:150px}
+.page-title{font-size:16px;font-weight:600;color:var(--text);line-height:1.2}
+.page-sub{font-size:11px;color:var(--mut);margin-top:2px}
+.main-actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.sprint-select{background:var(--sur2);color:var(--text);border:0.5px solid var(--bor);border-radius:7px;padding:6px 10px;font-size:11px;cursor:pointer;outline:none;min-width:180px}
+.page-content{flex:1;padding:22px;overflow-y:auto;max-width:1200px;margin:0 auto;width:100%}
+
+/* Hide old wrap class */
+.wrap{max-width:none;padding:0;margin:0}
+
+/* Page visibility */
+.page{display:none}
+.page.active{display:block}
+
+@media(max-width:860px){
+  .sidebar{position:fixed;left:0;top:0;bottom:0;z-index:100;transform:translateX(-100%);box-shadow:0 4px 20px rgba(0,0,0,.3)}
+  .sidebar.open{transform:translateX(0)}
+  .sidebar.collapsed{transform:translateX(-100%);width:240px}
+  .main-area{width:100%}
+}
+
 .d{--bg:#0c0e14;--sur:#151820;--sur2:#1c1f2e;--bor:#262a3d;--text:#dde1f5;--mut:#606888;--acc:#5b6ef5;--grn:#18c97a;--red:#f05252;--amb:#f5a623;--pur:#9b72f5;--teal:#22c4c4;background:var(--bg);color:var(--text);min-height:100vh}
 .d.light{--bg:#f0f2f9;--sur:#ffffff;--sur2:#e8ebf5;--bor:#d4d8ed;--text:#1a1d2e;--mut:#7278a0;--acc:#4050e8;--grn:#0aaa62;--red:#d93535;--amb:#c47e0a;--pur:#7c3aed;--teal:#0e9f9f}
 .wrap{max-width:1080px;margin:0 auto;padding:20px 16px 60px}
@@ -276,6 +332,87 @@ select{background:var(--sur);color:var(--text);border:0.5px solid var(--bor);bor
 .login-user .u-name{color:var(--text);font-weight:500}
 .login-logout{background:none;border:none;color:var(--mut);cursor:pointer;font-size:11px;padding:0 4px}
 .login-logout:hover{color:var(--red)}
+/* ── PDF / PRINT STYLES ── */
+@media print {
+  /* Force light theme for better print quality */
+  .d { --bg:#fff !important; --sur:#fff !important; --sur2:#f5f5f5 !important; --bor:#ddd !important;
+       --text:#000 !important; --mut:#555 !important; background:#fff !important; color:#000 !important; }
+  /* Hide interactive elements */
+  .topbar .tbr, #syncBtn, #thBtn, #userBadge, .pdf-btn, .tabs,
+  .sg-actions, .retro-add, .r-del, .sub-filter-row,
+  .login-wrap, select { display: none !important; }
+  /* Sprint selector — show as text instead */
+  .pdf-sprint-info { display: block !important; font-size: 13px; color: #555; margin-top: 4px; }
+  /* Ensure content fits */
+  .wrap { max-width: 100% !important; padding: 0 !important; margin: 0 !important; }
+  body { font-size: 11px; }
+  .sec { page-break-after: avoid; margin-top: 16px !important; }
+  .cc, .kpi, .sp-card, .imp-card, .bug-stat, .retro-card, .sg-card, .tp, .ec, .goal-card {
+    page-break-inside: avoid !important;
+    box-shadow: none !important;
+    border: 1px solid #ddd !important;
+  }
+  /* Charts */
+  canvas { max-width: 100% !important; height: auto !important; }
+  /* Tables */
+  table { page-break-inside: auto; }
+  tr { page-break-inside: avoid; page-break-after: auto; }
+  thead { display: table-header-group; }
+  /* Avoid cut-off at page edges */
+  .krow { grid-template-columns: repeat(5, 1fr) !important; gap: 6px !important; }
+  .tp-grid { grid-template-columns: repeat(4, 1fr) !important; gap: 6px !important; }
+  .kpi-v { font-size: 16px !important; }
+  .kpi { padding: 8px !important; }
+  /* No animations */
+  * { animation: none !important; transition: none !important; }
+  /* Page break between major sections for cleaner report */
+  .page-break { page-break-before: always; }
+}
+
+/* PDF button style */
+.pdf-btn { background: rgba(155,114,245,.12); color: var(--pur); border-color: rgba(155,114,245,.3); }
+.pdf-btn:hover { background: rgba(155,114,245,.2); color: var(--pur); border-color: var(--pur); }
+.pdf-sprint-info { display: none; }
+
+/* PDF Modal */
+.pdf-modal{position:fixed;inset:0;background:rgba(0,0,0,.7);display:none;align-items:center;justify-content:center;z-index:1000;padding:20px}
+.pdf-modal.on{display:flex}
+.pdf-modal-card{background:var(--sur);border:0.5px solid var(--bor);border-radius:12px;padding:24px;max-width:440px;width:100%}
+.pdf-modal-title{font-size:15px;font-weight:600;color:var(--text);margin-bottom:6px}
+.pdf-modal-sub{font-size:12px;color:var(--mut);margin-bottom:18px;line-height:1.6}
+.pdf-opts{display:flex;flex-direction:column;gap:10px;margin-bottom:18px}
+.pdf-opt{display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--sur2);border:1px solid var(--bor);border-radius:8px;cursor:pointer;font-size:12px;color:var(--text);transition:border-color .15s}
+.pdf-opt:hover{border-color:var(--acc)}
+.pdf-opt input{margin:0}
+.pdf-opt-title{font-weight:600;margin-bottom:2px}
+.pdf-opt-desc{font-size:10px;color:var(--mut)}
+.pdf-modal-actions{display:flex;gap:8px;justify-content:flex-end}
+.pdf-modal-actions .btn{padding:8px 18px;font-size:12px}
+
+/* ── USERS PAGE ── */
+.user-form{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.user-input{flex:1;min-width:130px;padding:8px 12px;background:var(--bg);border:1px solid var(--bor);border-radius:7px;color:var(--text);font-size:12px;font-family:inherit;outline:none}
+.user-input:focus{border-color:var(--acc)}
+.user-table{width:100%;border-collapse:collapse;font-size:12px;margin-top:10px}
+.user-table th{text-align:left;padding:9px 10px;background:var(--sur2);color:var(--mut);font-size:10px;text-transform:uppercase;letter-spacing:.5px;font-weight:600;border-bottom:1px solid var(--bor)}
+.user-table td{padding:6px 10px;border-bottom:0.5px solid var(--bor);vertical-align:middle;color:var(--text)}
+.user-table tr:last-child td{border-bottom:none}
+.user-cell{width:100%;padding:6px 9px;background:var(--bg);border:1px solid var(--bor);border-radius:5px;color:var(--text);font-size:11px;font-family:inherit;outline:none}
+.user-cell:focus{border-color:var(--acc)}
+
+/* ── THEME PICKER ── */
+.theme-opts{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:8px}
+@media(max-width:720px){.theme-opts{grid-template-columns:1fr}}
+.theme-opt{display:flex;align-items:center;gap:10px;padding:12px 14px;background:var(--sur2);border:2px solid var(--bor);border-radius:9px;cursor:pointer;transition:all .15s}
+.theme-opt:hover{border-color:var(--acc)}
+.theme-opt.on{border-color:var(--acc);background:rgba(91,110,245,.06)}
+.theme-opt input{margin:0}
+.theme-opt-title{font-weight:600;color:var(--text);font-size:12px}
+.theme-opt-desc{font-size:10px;color:var(--mut);margin-top:2px}
+.sett-tbl{width:100%;border-collapse:collapse;font-size:12px}
+.sett-tbl td{padding:10px 0;border-bottom:0.5px solid var(--bor)}
+.sett-tbl td:first-child{color:var(--mut);width:120px}
+
 @media(max-width:720px){
   .krow{grid-template-columns:repeat(2,1fr)}
   .tp-grid{grid-template-columns:repeat(2,1fr)}
@@ -302,31 +439,105 @@ select{background:var(--sur);color:var(--text);border:0.5px solid var(--bor);bor
   </div>
 </div>
 
-<!-- MAIN DASHBOARD -->
-<div class="wrap" id="dashboardView" style="display:none">
-  <div class="topbar">
-    <div class="brand">
-      <h1>Sprint Performance Dashboard</h1>
-      <p>Playspare · MSS Team · Live data from Google Sheets</p>
-    </div>
-    <div class="tbr">
-      <select id="spSel"></select>
-      <button class="btn btn-acc" id="syncBtn">Refresh</button>
-      <button class="btn" id="thBtn">Light mode</button>
-      <div class="login-user" id="userBadge">
-        <span>👤 <span class="u-name" id="userName"></span></span>
-        <button class="login-logout" onclick="logoutUser()">Logout</button>
+<!-- MAIN DASHBOARD with SIDEBAR -->
+<div class="app-shell" id="dashboardView" style="display:none">
+  <!-- Sidebar -->
+  <aside class="sidebar" id="sidebar">
+    <div class="sb-header">
+      <div class="sb-logo">PS</div>
+      <div class="sb-brand">
+        <div class="sb-title">Playspare</div>
+        <div class="sb-sub">Sprint Dashboard</div>
       </div>
     </div>
-  </div>
-  <div id="mc">
-    <div class="loading"><div class="spin"></div><p>Loading data from Google Sheets...</p></div>
-  </div>
+
+    <nav class="sb-nav">
+      <div class="sb-group">Sprint</div>
+      <a class="sb-item on" data-page="overview"><span class="sb-icon">📊</span>Overview</a>
+      <a class="sb-item" data-page="goals"><span class="sb-icon">🎯</span>Goals</a>
+      <a class="sb-item" data-page="burndown"><span class="sb-icon">🔥</span>Burndown</a>
+      <a class="sb-item" data-page="team"><span class="sb-icon">👥</span>Team</a>
+      <a class="sb-item" data-page="bugs"><span class="sb-icon">🐛</span>Bugs</a>
+      <a class="sb-item" data-page="spillovers"><span class="sb-icon">🔄</span>Spillovers</a>
+      <a class="sb-item" data-page="retro"><span class="sb-icon">📝</span>Retrospective</a>
+      <a class="sb-item" data-page="performance"><span class="sb-icon">🏆</span>Performance</a>
+
+      <div class="sb-group">Admin</div>
+      <a class="sb-item" data-page="users" id="nav-users"><span class="sb-icon">👤</span>Users</a>
+      <a class="sb-item" data-page="settings"><span class="sb-icon">⚙️</span>Settings</a>
+    </nav>
+
+    <div class="sb-footer">
+      <div class="sb-user">
+        <div class="sb-avatar" id="userAvatar">U</div>
+        <div class="sb-user-info">
+          <div class="sb-user-name" id="userName">User</div>
+          <div class="sb-user-role" id="userRole">Viewer</div>
+        </div>
+      </div>
+      <button class="sb-logout" onclick="logoutUser()" title="Logout">⏻</button>
+    </div>
+  </aside>
+
+  <!-- Main content -->
+  <main class="main-area">
+    <div class="main-topbar">
+      <button class="hamburger" onclick="toggleSidebar()" title="Toggle sidebar">☰</button>
+      <div class="page-title-wrap">
+        <div class="page-title" id="pageTitle">Overview</div>
+        <div class="page-sub" id="pageSub">Sprint performance at a glance</div>
+      </div>
+      <div class="main-actions">
+        <select id="spSel" class="sprint-select"></select>
+        <button class="btn btn-acc" id="syncBtn">⟳ Refresh</button>
+        <button class="btn pdf-btn" id="pdfBtn">📄 PDF</button>
+      </div>
+    </div>
+
+    <div class="page-content" id="mc">
+      <div class="loading"><div class="spin"></div><p>Loading data from Google Sheets...</p></div>
+    </div>
+  </main>
 </div>
 </div>
 
+<!-- PDF Export Modal -->
+<div class="pdf-modal" id="pdfModal">
+  <div class="pdf-modal-card">
+    <div class="pdf-modal-title">Export Dashboard as PDF</div>
+    <div class="pdf-modal-sub">Choose what to include in the export. You will be taken to your browser's print dialog — select "Save as PDF" as the destination.</div>
+    <div class="pdf-opts">
+      <label class="pdf-opt">
+        <input type="radio" name="pdfScope" value="full" checked>
+        <div>
+          <div class="pdf-opt-title">Full Report</div>
+          <div class="pdf-opt-desc">Everything — KPIs, charts, bugs, subtasks, retro, performance</div>
+        </div>
+      </label>
+      <label class="pdf-opt">
+        <input type="radio" name="pdfScope" value="summary">
+        <div>
+          <div class="pdf-opt-title">Summary Only</div>
+          <div class="pdf-opt-desc">Score card + sprint progress + goal + performance scorecard</div>
+        </div>
+      </label>
+      <label class="pdf-opt">
+        <input type="radio" name="pdfScope" value="retro">
+        <div>
+          <div class="pdf-opt-title">Retrospective Only</div>
+          <div class="pdf-opt-desc">Sprint goal + retrospective sections (for sprint reviews)</div>
+        </div>
+      </label>
+    </div>
+    <div class="pdf-modal-actions">
+      <button class="btn" onclick="closePdfModal()">Cancel</button>
+      <button class="btn btn-acc" onclick="generatePDF()">Export</button>
+    </div>
+  </div>
+</div>
+
 <script>
-var API='https://script.google.com/macros/s/AKfycbx1oX9blyQ5yx1lWPWdbzqivrg4CkltuPe4chvP_COJXFubhZDbWhP8yUFGRsNG5alTmw/exec';
+var API='https://script.google.com/macros/s/AKfycbxLnHe5-F1JWcovwVmRAbJ6ll-pdP1kdhHkBIKRorPBauDHDg7knEKVRC5wSUUfOOypAw/exec';
 var CH={},isDark=true,raw=null,cur=null,curTeam='All',curIndvTeam='All';
 var TC=['#5b6ef5','#18c97a','#9b72f5','#f5a623','#f05252','#22c4c4','#0aaa62'];
 var TEAM_COLORS={};
@@ -398,15 +609,34 @@ function process(json,spId){
   var totEst=0,totLog=0,done=0,prog=0,ns=0,ovd=0;
   var cTimes=[],early=[],unplanned=[],drainers=[],stars=[];
 
-  // Helper: detect unplanned from featureTag OR taskType (any variant containing "unplanned")
+  // Unplanned = Feature Tag contains "Unplanned"
   function isUnplanned(t){
-    var tag=(t.featureTag||t['Feature Tag']||t.feature_tag||'').toString().toLowerCase();
-    var type=(t.taskType||'').toString().toLowerCase();
-    return tag.indexOf('unplanned')!==-1 || type==='unplanned';
+    return (t.featureTag||'').toLowerCase().split(',').some(function(x){
+      return x.trim().toLowerCase()==='unplanned';
+    });
   }
 
-  // Combined list of tasks + subtasks for KPI calculations
-  var allItems = tasks.concat(subtasks);
+  // ── Build "effective work units" list — avoids double counting ──
+  //
+  // Rule: If a parent task has subtasks, the WORK happens in subtasks.
+  //       Count subtasks, skip parent.
+  // If a task has NO subtasks, count it directly (it's a leaf).
+  //
+  // This way: every unit of est/log is counted exactly once.
+
+  var parentsWithSubtasks = {};
+  subtasks.forEach(function(s){
+    var p = (s.parentTask || '').trim();
+    if(p) parentsWithSubtasks[p] = true;
+  });
+
+  // Filter: keep tasks that are leaves (no subtasks), skip parents of subtasks
+  var leafTasks = tasks.filter(function(t){
+    return !parentsWithSubtasks[(t.taskName || '').trim()];
+  });
+
+  // allItems = leaf tasks + all subtasks (no double counting)
+  var allItems = leafTasks.concat(subtasks);
 
   allItems.forEach(function(t){
     var est=parseFloat(t.estTime)||0;
@@ -544,29 +774,95 @@ function process(json,spId){
     bugsRaw: allBugs,
     sprintGoals: json.sprintGoals||{},
     retrospectives: json.retrospectives||{},
+    teamCapacity: json.teamCapacity||{},
   };
 }
 
 /* ── RENDER ── */
-function render(d){
-  document.getElementById('mc').innerHTML=shell();
-  document.getElementById('st').textContent='Last synced: '+new Date().toLocaleTimeString();
-  doKPIs(d); doProgress(d); doSprintGoal(d);
-  doBurn(d); doArea(d);
-  doIndividual(d,'All'); doScopeEffort(d); doImpact(d);
-  window._sprintData=d;
-  doSpillovers(d); doBugsBacklog(d);
-  doTabs(d); doCombo(d,'All');
-  doDrainersStars(d); doPerformance(d); doEarly(d);
-  doRetrospective(d);
+var currentPage = 'overview';
+var PAGES = {
+  overview   : { title: 'Overview',       sub: 'Sprint performance at a glance' },
+  goals      : { title: 'Sprint Goals',   sub: 'Define and track sprint goals' },
+  burndown   : { title: 'Burndown',       sub: 'Sprint progress over time' },
+  team       : { title: 'Team',           sub: 'Time distribution and individual performance' },
+  bugs       : { title: 'Bugs & Polish',  sub: 'Bug tracking across sprints' },
+  spillovers : { title: 'Spillovers',     sub: 'Carried over tasks and backlog items' },
+  retro      : { title: 'Retrospective',  sub: 'Sprint reflections and learnings' },
+  performance: { title: 'Performance',    sub: 'Individual scorecards and rankings' },
+  users      : { title: 'Users',          sub: 'Manage dashboard access and team capacity' },
+  settings   : { title: 'Settings',       sub: 'Theme and preferences' },
+};
+
+function switchPage(page){
+  if(!PAGES[page]) page = 'overview';
+  currentPage = page;
+  // Update active nav
+  document.querySelectorAll('.sb-item').forEach(function(el){
+    el.classList.toggle('on', el.dataset.page === page);
+  });
+  // Update title
+  document.getElementById('pageTitle').textContent = PAGES[page].title;
+  document.getElementById('pageSub').textContent = PAGES[page].sub;
+  // Show selected page, hide others
+  document.querySelectorAll('.page').forEach(function(el){
+    el.classList.toggle('active', el.id === 'page-' + page);
+  });
+  // Close sidebar on mobile
+  if(window.innerWidth <= 860){
+    document.getElementById('sidebar').classList.remove('open');
+  }
+  // Re-render if data exists (charts re-init properly when made visible)
+  if(raw && window._sprintData){
+    requestAnimationFrame(function(){
+      renderPage(page, window._sprintData);
+    });
+  }
 }
 
-/* ── SHELL HTML ── */
-function shell(){
-  return '<div class="sbar"><span><span class="sdot"></span><span id="st"></span></span><span style="color:var(--grn)">Live · Google Sheets</span></div>'
+function renderPage(page, d){
+  if(page === 'overview'){
+    doKPIs(d); doProgress(d);
+  } else if(page === 'goals'){
+    doSprintGoal(d);
+  } else if(page === 'burndown'){
+    doBurn(d);
+  } else if(page === 'team'){
+    doArea(d); doIndividual(d, curIndvTeam || 'All'); doScopeEffort(d); doImpact(d); doTabs(d); doCombo(d, curTeam || 'All');
+  } else if(page === 'bugs'){
+    doBugsBacklog(d);
+  } else if(page === 'spillovers'){
+    doSpillovers(d);
+  } else if(page === 'retro'){
+    doRetrospective(d);
+  } else if(page === 'performance'){
+    doDrainersStars(d); doPerformance(d); doEarly(d);
+  } else if(page === 'users'){
+    doUsersPage(d);
+  } else if(page === 'settings'){
+    doSettingsPage(d);
+  }
+}
 
-  /* 1. SCORECARD */
-  +'<div class="sec">Score card</div>'
+function render(d){
+  document.getElementById('mc').innerHTML = shell();
+  window._sprintData = d;
+  // Show Users page only for Admin
+  var usersNav = document.getElementById('nav-users');
+  if(usersNav){
+    if(window._userRole === 'Admin') usersNav.removeAttribute('data-hidden');
+    else usersNav.setAttribute('data-hidden', '1');
+  }
+  // Render subtasks data (used across pages)
+  if(typeof doSubtasks === 'function') doSubtasks(d);
+  // Render current page
+  renderPage(currentPage, d);
+}
+
+/* ── SHELL HTML — Multi-page layout ── */
+function shell(){
+  return ''
+  /* OVERVIEW */
+  +'<div class="page active" id="page-overview">'
   +'<div class="krow" id="kr1"></div>'
   +'<div class="krow" id="kr2"></div>'
   +'<div class="sp-card">'
@@ -577,30 +873,32 @@ function shell(){
   +'<div class="day-row" id="dRow"></div>'
   +'<div class="tp-grid" id="tpG"></div>'
   +'</div>'
+  +'</div>'
 
-  /* 2. SPRINT GOAL (overall) */
-  +'<div class="sec">Sprint goal</div>'
+  /* GOALS */
+  +'<div class="page" id="page-goals">'
   +'<div id="sprintGoalBox"></div>'
+  +'</div>'
 
-
-
-  /* 3. BURNDOWN */
-  +'<div class="sec">Burndown</div>'
+  /* BURNDOWN */
+  +'<div class="page" id="page-burndown">'
   +'<div class="cc">'
   +'<div class="cc-t">Burndown chart — remaining hours</div>'
-  +'<div class="cc-s">Stepped tracking of remaining hours vs ideal trajectory</div>'
+  +'<div class="cc-s">Ideal line is based on team capacity (sum of daily hours of active members). Set per-user hours in Users page.</div>'
   +'<div class="leg"><span class="li"><span class="lsq" style="background:#5b6ef5"></span>Ideal burndown</span>'
   +'<span class="li"><span class="lsq" style="background:#f05252"></span>Actual remaining</span></div>'
-  +'<div style="position:relative;height:220px"><canvas id="bC"></canvas></div></div>'
+  +'<div style="position:relative;height:340px"><canvas id="bC"></canvas></div>'
+  +'<div id="burnCapInfo" style="font-size:11px;color:var(--mut);margin-top:10px"></div>'
+  +'</div>'
+  +'</div>'
 
-  /* 4. TIME & SCOPE */
-  +'<div class="sec">Time logs · Scope creep · Unplanned tasks</div>'
+  /* TEAM */
+  +'<div class="page" id="page-team">'
   +'<div class="cc"><div class="cc-t">Est. time vs time logged — by team</div>'
   +'<div class="cc-s">Estimated hours vs actual logged hours per team</div>'
   +'<div class="leg"><span class="li"><span class="lsq" style="background:#5b6ef5"></span>Est. time</span>'
   +'<span class="li"><span class="lsq" style="background:#18c97a"></span>Time logged</span></div>'
-  +'<div style="position:relative;height:200px"><canvas id="aC"></canvas></div></div>'
-
+  +'<div style="position:relative;height:220px"><canvas id="aC"></canvas></div></div>'
   +'<div class="cc"><div class="cc-t">Est. time vs time logged — individual</div>'
   +'<div class="cc-s">Filter by team · Click any bar to see task breakdown</div>'
   +'<div class="tabs" id="indvTabs"></div>'
@@ -610,55 +908,65 @@ function shell(){
   +'<div id="indvWrap" style="position:relative"><canvas id="indvC"></canvas></div>'
   +'<div id="bdBox" style="display:none;margin-top:20px;background:var(--sur2);padding:16px;border-radius:10px;border:1px solid var(--acc)"></div>'
   +'</div>'
-
   +'<div class="g2">'
   +'<div class="cc"><div class="cc-t">Scope creep by team</div><div class="cc-s">Planned (blue) vs unplanned (red)</div><div id="scB"></div></div>'
   +'<div class="cc"><div class="cc-t">Effort distribution</div><div class="cc-s">Logged hours by team</div>'
   +'<div class="ef-wrap"><div style="position:relative;width:110px;height:110px;flex-shrink:0"><canvas id="dC"></canvas></div>'
   +'<div class="ef-leg" id="eL"></div></div></div></div>'
-
   +'<div id="impactS"></div>'
-
-  /* 5. SPILLOVERS */
-  +'<div class="sec">Spillovers</div>'
-  +'<div class="g2">'
-  +'<div class="cc"><div class="cc-t">Carried over tasks</div><div class="cc-s">Tasks from previous sprint still active</div><div id="carryS"></div></div>'
-  +'<div class="cc"><div class="cc-t">Backlog section items</div><div class="cc-s">Tasks currently in the Backlog section</div><div id="backlogS"></div></div>'
-  +'</div>'
-
-  /* 6. SUBTASKS */
-  +''
-
-  /* 7. BUGS & POLISH */
-  +'<div class="sec">Bugs and polish</div>'
-  +'<div id="bugsS"></div>'
-
-  /* 8. ASSIGNEE OVERVIEW */
-  +'<div class="sec">Assignee overview and performance</div>'
+  +'<div class="sec">Assignee overview</div>'
   +'<div class="tabs" id="tRow"></div>'
   +'<div class="cc"><div class="cc-t" id="cT">All members</div>'
   +'<div class="cc-s">Est. and logged time (bars) · Task count (line)</div>'
   +'<div class="leg"><span class="li"><span class="lsq" style="background:#9b72f5"></span>Est. time</span>'
   +'<span class="li"><span class="lsq" style="background:#18c97a"></span>Time logged</span>'
   +'<span class="li"><span class="lsq" style="background:#f5a623;border-radius:50%"></span>Tasks</span></div>'
-  +'<div style="position:relative;height:240px"><canvas id="cC"></canvas></div></div>'
+  +'<div style="position:relative;height:260px"><canvas id="cC"></canvas></div></div>'
+  +'</div>'
 
+  /* BUGS */
+  +'<div class="page" id="page-bugs">'
+  +'<div id="bugsS"></div>'
+  +'</div>'
+
+  /* SPILLOVERS */
+  +'<div class="page" id="page-spillovers">'
+  +'<div class="g2">'
+  +'<div class="cc"><div class="cc-t">Carried over tasks</div><div class="cc-s">Tasks from previous sprint still active</div><div id="carryS"></div></div>'
+  +'<div class="cc"><div class="cc-t">Backlog section items</div><div class="cc-s">Tasks currently in the Backlog section</div><div id="backlogS"></div></div>'
+  +'</div>'
+  +'<div class="sec">Subtask breakdown</div>'
+  +'<div id="subS"></div>'
+  +'</div>'
+
+  /* RETRO */
+  +'<div class="page" id="page-retro">'
+  +'<div id="retroS"></div>'
+  +'</div>'
+
+  /* PERFORMANCE */
+  +'<div class="page" id="page-performance">'
   +'<div class="g2">'
   +'<div class="cc"><div class="cc-t">Top impact performers</div><div class="cc-s">Exceptional ratings (5/5)</div><div id="starsS"></div></div>'
   +'<div class="cc"><div class="cc-t">Top 5 time drainers</div><div class="cc-s">Tasks over estimated budget</div><div id="drainS"></div></div>'
   +'</div>'
-
   +'<div class="cc"><div class="cc-t">Performance scorecard</div>'
   +'<div class="cc-s">Composite score · Completion 30% · Estimation 25% · Productivity 15% · Impact 20% · Early bonus 10% · Drainers −15%</div>'
   +'<div id="perfS"></div></div>'
-
-  /* 9. EARLY COMPLETIONS */
   +'<div class="sec">Early completions</div>'
   +'<div id="eS"></div>'
+  +'</div>'
 
-  /* 10. SPRINT RETROSPECTIVE */
-  +'<div class="sec">Sprint retrospective</div>'
-  +'<div id="retroS"></div>';
+  /* USERS */
+  +'<div class="page" id="page-users">'
+  +'<div id="usersPage"></div>'
+  +'</div>'
+
+  /* SETTINGS */
+  +'<div class="page" id="page-settings">'
+  +'<div id="settingsPage"></div>'
+  +'</div>'
+  ;
 }
 
 /* ── KPIs ── */
@@ -902,13 +1210,59 @@ function axO(){
 function doBurn(d){
   if(CH.b)CH.b.destroy();
   var c=cc();
+
+  // ── Capacity-based burndown ──
+  // Calculate total team capacity: sum of daily hours of active members in this sprint
+  var activeAsns = (d.assignees||[]).filter(function(a){return a.n !== 'Unassigned' && a.tot > 0;});
+  var capacityMap = d.teamCapacity || {};
+  var totalDailyCapacity = 0;
+  var membersWithCapacity = 0;
+  var membersWithoutCapacity = [];
+
+  activeAsns.forEach(function(a){
+    var cap = capacityMap[a.n];
+    if(cap && cap.hours > 0){
+      totalDailyCapacity += cap.hours;
+      membersWithCapacity++;
+    } else {
+      totalDailyCapacity += 6; // default
+      membersWithoutCapacity.push(a.n);
+    }
+  });
+
+  // Sprint days
+  var days = d.dTot || 10;
+
+  // Build ideal line — capacity-based
+  // Assumes work happens on all days (can be refined to working days later)
+  var idealData = [];
+  for(var i = 0; i < d.bL.length; i++){
+    var remaining = Math.max(0, d.totEst - (totalDailyCapacity * i));
+    idealData.push(rnd(remaining));
+  }
+
+  // Info text
+  var infoEl = document.getElementById('burnCapInfo');
+  if(infoEl){
+    var infoTxt = '<b>Team capacity:</b> '+totalDailyCapacity+' hrs/day ('+activeAsns.length+' members, '+days+' day sprint = '+rnd(totalDailyCapacity*days)+' total capacity hrs)';
+    if(membersWithoutCapacity.length){
+      infoTxt += '<br><span style="color:var(--amb)">Note: '+membersWithoutCapacity.length+' member(s) using default 6 hrs/day — set their hours in Users page.</span>';
+    }
+    infoTxt += '<br><span style="color:var(--mut)">Total estimated work: '+d.totEst+' hrs · Total logged: '+d.totLog+' hrs</span>';
+    infoEl.innerHTML = infoTxt;
+  }
+
   CH.b=new Chart(document.getElementById('bC'),{type:'line',data:{labels:d.bL,datasets:[
-    {label:'Ideal',  data:d.bI,borderColor:'#5b6ef5',borderDash:[6,4],borderWidth:2,pointRadius:0,stepped:true,fill:false},
-    {label:'Actual', data:d.bA,borderColor:'#f05252',backgroundColor:'rgba(240,82,82,.15)',fill:true,borderWidth:3,pointRadius:4,pointBackgroundColor:'#f05252',stepped:true}
+    {label:'Ideal (capacity-based)',  data:idealData, borderColor:'#5b6ef5',borderDash:[6,4],borderWidth:2,pointRadius:0,stepped:false,fill:false,tension:.1},
+    {label:'Actual remaining', data:d.bA, borderColor:'#f05252',backgroundColor:'rgba(240,82,82,.15)',fill:true,borderWidth:3,pointRadius:4,pointBackgroundColor:'#f05252',stepped:true}
   ]},options:{responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false},
-    plugins:{legend:{display:false}},
+    plugins:{legend:{display:false},tooltip:{callbacks:{
+      label: function(ctx){
+        return ctx.dataset.label + ': ' + ctx.parsed.y + ' hrs';
+      }
+    }}},
     scales:{x:{grid:{color:c.grid},ticks:{color:c.text,font:{weight:'500'}}},
-            y:{grid:{color:c.grid},ticks:{color:c.text},title:{display:true,text:'Remaining Hours',color:c.text}}}}});
+            y:{grid:{color:c.grid},ticks:{color:c.text},title:{display:true,text:'Remaining Hours',color:c.text},beginAtZero:true}}}});
 }
 
 /* ── AREA CHART ── */
@@ -1029,7 +1383,7 @@ function showBreakdown(asn,data){
     html+='<tr style="border-bottom:0.5px solid var(--bor);'+(v>0?'background:rgba(240,82,82,.04)':'')+'">'
       +'<td style="padding:8px;color:var(--text);font-weight:600">'+trunc(x.taskName,50)+'</td>'
       +'<td style="padding:8px"><span class="badge '+stCls+'">'+st+'</span></td>'
-      +'<td style="padding:8px"><span class="badge">'+(x.taskType||'Planned')+'</span></td>'
+      +(isUnplanned(x)?'<td style="padding:8px"><span class="badge red">Unplanned</span></td>':'<td style="padding:8px"><span class="badge">Planned</span></td>')
       +'<td style="padding:8px;color:var(--mut)">'+est+'h</td>'
       +'<td style="padding:8px;color:var(--mut)">'+log+'h</td>'
       +'<td style="padding:8px;color:'+vCol+';font-weight:600">'+vTxt+'</td></tr>';
@@ -1674,6 +2028,200 @@ function doEarly(d){
   }).join('')+'</div>';
 }
 
+// ── USERS PAGE ──
+async function doUsersPage(d){
+  var el = document.getElementById('usersPage'); if(!el) return;
+  if(window._userRole !== 'Admin'){
+    el.innerHTML = '<div class="empty">Admin access required to manage users.</div>';
+    return;
+  }
+  el.innerHTML = '<div class="loading"><div class="spin"></div><p>Loading users...</p></div>';
+  try {
+    var url = API + '?action=listUsers&email=' + encodeURIComponent(window._userEmail) + '&_cb=' + Date.now();
+    var res = await fetch(url, {method:'GET', redirect:'follow'});
+    var txt = await res.text();
+    var json = JSON.parse(txt.trim());
+    if(json.error){ el.innerHTML = '<div class="err">'+(json.message||json.error)+'</div>'; return; }
+    renderUsersList(json.users || []);
+  } catch(e){
+    el.innerHTML = '<div class="err">Failed to load users: '+e.message+'</div>';
+  }
+}
+
+function renderUsersList(users){
+  var el = document.getElementById('usersPage'); if(!el) return;
+  var teams = ['QA', 'Design', 'Dev', 'Art', 'UA', 'Marketing', 'Other'];
+  var roles = ['Admin', 'Viewer'];
+  var html = '<div class="cc">'
+    + '<div class="cc-t">Add new user</div>'
+    + '<div class="cc-s">Grants dashboard access and sets capacity</div>'
+    + '<div class="user-form">'
+    + '  <input type="text" id="nuName" class="user-input" placeholder="Full name">'
+    + '  <input type="email" id="nuEmail" class="user-input" placeholder="email@playspare.com">'
+    + '  <select id="nuRole" class="user-input">' + roles.map(function(r){return '<option>'+r+'</option>';}).join('') + '</select>'
+    + '  <select id="nuTeam" class="user-input"><option value="">Team...</option>' + teams.map(function(t){return '<option>'+t+'</option>';}).join('') + '</select>'
+    + '  <input type="number" id="nuHours" class="user-input" placeholder="Hrs" value="6" step="0.5" min="0" max="12" style="width:80px">'
+    + '  <button class="btn btn-acc" onclick="addUser()">Add</button>'
+    + '</div>'
+    + '<div id="nuStatus" style="font-size:11px;color:var(--mut);margin-top:8px"></div>'
+    + '</div>';
+  html += '<div class="cc" style="margin-top:12px">'
+    + '<div class="cc-t">Team members (' + users.length + ')</div>'
+    + '<div class="cc-s">Edit inline then click Save · Changes persist to Google Sheet</div>'
+    + '<div style="overflow-x:auto"><table class="user-table">'
+    + '<thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Team</th><th>Hrs/day</th><th></th></tr></thead>'
+    + '<tbody>'
+    + users.map(function(u){
+      return '<tr data-email="'+u.email+'">'
+        + '<td><input class="user-cell" data-field="name" value="'+(u.name||'').replace(/"/g,'&quot;')+'"></td>'
+        + '<td style="color:var(--mut);font-size:11px">'+u.email+'</td>'
+        + '<td><select class="user-cell" data-field="role">' + roles.map(function(r){return '<option '+(r===u.role?'selected':'')+'>'+r+'</option>';}).join('') + '</select></td>'
+        + '<td><select class="user-cell" data-field="team"><option value="">—</option>' + teams.map(function(t){return '<option '+(t===u.team?'selected':'')+'>'+t+'</option>';}).join('') + '</select></td>'
+        + '<td><input type="number" class="user-cell" data-field="hours" value="'+u.hours+'" step="0.5" min="0" max="12" style="width:70px"></td>'
+        + '<td style="text-align:right;white-space:nowrap"><button class="btn" onclick="saveUserRow(this)">Save</button> <button class="btn" style="color:var(--red);border-color:rgba(240,82,82,.3)" onclick="deleteUserRow(\''+u.email+'\')">Del</button></td>'
+        + '</tr>';
+    }).join('')
+    + '</tbody></table></div>'
+    + (users.length === 0 ? '<div class="empty" style="margin-top:14px">No users yet. Add the first user above.</div>' : '')
+    + '</div>';
+  el.innerHTML = html;
+}
+
+async function addUser(){
+  var name  = document.getElementById('nuName').value.trim();
+  var email = document.getElementById('nuEmail').value.trim().toLowerCase();
+  var role  = document.getElementById('nuRole').value;
+  var team  = document.getElementById('nuTeam').value;
+  var hours = document.getElementById('nuHours').value || 6;
+  var statusEl = document.getElementById('nuStatus');
+  if(!name || !email){ statusEl.textContent = 'Name and email required.'; statusEl.style.color = 'var(--red)'; return; }
+  statusEl.textContent = 'Saving...'; statusEl.style.color = 'var(--mut)';
+  try {
+    var params = '?action=saveUser&email=' + encodeURIComponent(window._userEmail)
+      + '&targetName=' + encodeURIComponent(name) + '&targetEmail=' + encodeURIComponent(email)
+      + '&targetRole=' + encodeURIComponent(role) + '&targetTeam=' + encodeURIComponent(team)
+      + '&targetHours=' + encodeURIComponent(hours) + '&_cb=' + Date.now();
+    var res = await fetch(API + params, {method:'GET', redirect:'follow'});
+    var json = JSON.parse((await res.text()).trim());
+    if(json.ok){
+      statusEl.textContent = 'User added.'; statusEl.style.color = 'var(--grn)';
+      setTimeout(function(){ doUsersPage(window._sprintData); }, 500);
+    } else {
+      statusEl.textContent = 'Error: ' + (json.message || json.error); statusEl.style.color = 'var(--red)';
+    }
+  } catch(e){ statusEl.textContent = 'Error: ' + e.message; statusEl.style.color = 'var(--red)'; }
+}
+
+async function saveUserRow(btn){
+  var row = btn.closest('tr');
+  var email = row.dataset.email;
+  var name = row.querySelector('[data-field="name"]').value.trim();
+  var role = row.querySelector('[data-field="role"]').value;
+  var team = row.querySelector('[data-field="team"]').value;
+  var hours = row.querySelector('[data-field="hours"]').value || 6;
+  var orig = btn.textContent;
+  btn.textContent = 'Saving...'; btn.disabled = true;
+  try {
+    var params = '?action=saveUser&email=' + encodeURIComponent(window._userEmail)
+      + '&targetName=' + encodeURIComponent(name) + '&targetEmail=' + encodeURIComponent(email)
+      + '&targetRole=' + encodeURIComponent(role) + '&targetTeam=' + encodeURIComponent(team)
+      + '&targetHours=' + encodeURIComponent(hours) + '&_cb=' + Date.now();
+    var res = await fetch(API + params, {method:'GET', redirect:'follow'});
+    var json = JSON.parse((await res.text()).trim());
+    btn.textContent = json.ok ? 'Saved ✓' : 'Failed';
+    btn.disabled = false;
+    setTimeout(function(){ btn.textContent = orig; }, 1500);
+  } catch(e){ btn.textContent = 'Failed'; btn.disabled = false; }
+}
+
+async function deleteUserRow(email){
+  if(!confirm('Remove user ' + email + '?')) return;
+  try {
+    var params = '?action=deleteUser&email=' + encodeURIComponent(window._userEmail)
+      + '&targetEmail=' + encodeURIComponent(email) + '&_cb=' + Date.now();
+    var res = await fetch(API + params, {method:'GET', redirect:'follow'});
+    var json = JSON.parse((await res.text()).trim());
+    if(json.ok) doUsersPage(window._sprintData);
+    else alert('Failed: ' + (json.message || json.error));
+  } catch(e){ alert('Error: ' + e.message); }
+}
+
+// ── SETTINGS PAGE ──
+function doSettingsPage(){
+  var el = document.getElementById('settingsPage'); if(!el) return;
+  var themePref = localStorage.getItem('themePref') || 'dark';
+  var opts = [
+    {k:'dark',  l:'Dark',        d:'Easy on the eyes'},
+    {k:'light', l:'Light',       d:'High contrast'},
+    {k:'auto',  l:'Auto (system)', d:'Follows your OS setting'},
+  ];
+  el.innerHTML = '<div class="cc">'
+    + '<div class="cc-t">Theme</div>'
+    + '<div class="cc-s">Choose how the dashboard looks</div>'
+    + '<div class="theme-opts">'
+    + opts.map(function(o){
+        return '<label class="theme-opt'+(themePref===o.k?' on':'')+'">'
+          + '<input type="radio" name="themePref" value="'+o.k+'" '+(themePref===o.k?'checked':'')+' onchange="setTheme(\''+o.k+'\')">'
+          + '<div><div class="theme-opt-title">'+o.l+'</div><div class="theme-opt-desc">'+o.d+'</div></div>'
+          + '</label>';
+      }).join('')
+    + '</div></div>'
+    + '<div class="cc" style="margin-top:12px">'
+    + '<div class="cc-t">Session</div>'
+    + '<div class="cc-s">Current sign-in details</div>'
+    + '<table class="sett-tbl">'
+    + '<tr><td>Email</td><td>'+window._userEmail+'</td></tr>'
+    + '<tr><td>Name</td><td>'+(window._userName||'—')+'</td></tr>'
+    + '<tr><td>Role</td><td><span class="badge acc">'+(window._userRole||'Viewer')+'</span></td></tr>'
+    + '</table></div>';
+}
+
+function setTheme(mode){
+  localStorage.setItem('themePref', mode);
+  applyTheme(mode);
+  if(raw && window._sprintData) renderPage(currentPage, window._sprintData);
+  if(currentPage === 'settings') doSettingsPage();
+}
+
+function applyTheme(mode){
+  mode = mode || localStorage.getItem('themePref') || 'dark';
+  var dark = true;
+  if(mode === 'light') dark = false;
+  else if(mode === 'auto'){
+    dark = !window.matchMedia('(prefers-color-scheme: light)').matches;
+  }
+  isDark = dark;
+  document.getElementById('root').classList.toggle('light', !dark);
+}
+
+if(window.matchMedia){
+  window.matchMedia('(prefers-color-scheme: light)').addEventListener('change', function(){
+    if(localStorage.getItem('themePref') === 'auto'){
+      applyTheme('auto');
+      if(raw && window._sprintData) renderPage(currentPage, window._sprintData);
+    }
+  });
+}
+
+// ── SIDEBAR HANDLERS ──
+function toggleSidebar(){
+  var sb = document.getElementById('sidebar');
+  if(window.innerWidth <= 860){
+    sb.classList.toggle('open');
+  } else {
+    sb.classList.toggle('collapsed');
+  }
+}
+
+function setupSidebar(){
+  document.querySelectorAll('.sb-item').forEach(function(el){
+    el.addEventListener('click', function(){
+      if(this.getAttribute('data-hidden') === '1') return;
+      switchPage(this.dataset.page);
+    });
+  });
+}
+
 /* ── INIT ── */
 function init(){
   TEAM_COLORS={};
@@ -1715,12 +2263,7 @@ document.getElementById('spSel').addEventListener('change',function(){
   if(raw)render(process(raw,cur));
 });
 document.getElementById('syncBtn').addEventListener('click',init);
-document.getElementById('thBtn').addEventListener('click',function(){
-  isDark=!isDark;
-  document.getElementById('root').classList.toggle('light',!isDark);
-  this.textContent=isDark?'Light mode':'Dark mode';
-  if(raw)render(process(raw,cur));
-});
+// Theme toggle now handled via Settings page
 
 // ── AUTH FLOW ──
 function showLoginScreen(){
@@ -1734,8 +2277,22 @@ function showLoginScreen(){
 
 function showDashboard(name){
   document.getElementById('loginScreen').style.display='none';
-  document.getElementById('dashboardView').style.display='block';
-  document.getElementById('userName').textContent = name || window._userEmail;
+  document.getElementById('dashboardView').style.display='flex';
+  var displayName = name || window._userEmail;
+  document.getElementById('userName').textContent = displayName;
+  document.getElementById('userRole').textContent = window._userRole || 'Viewer';
+  var avatarEl = document.getElementById('userAvatar');
+  if(avatarEl) avatarEl.textContent = displayName.charAt(0).toUpperCase();
+  // Hide users nav for non-admin
+  var usersNav = document.getElementById('nav-users');
+  if(usersNav){
+    if(window._userRole === 'Admin') usersNav.removeAttribute('data-hidden');
+    else usersNav.setAttribute('data-hidden', '1');
+  }
+  // Apply saved theme
+  applyTheme(localStorage.getItem('themePref') || 'dark');
+  // Setup sidebar click handlers
+  setupSidebar();
   init();
 }
 
@@ -1793,6 +2350,138 @@ document.getElementById('loginEmail').addEventListener('keydown', function(e){
     document.getElementById('loginBtn').click();
   }
 });
+
+// ── PDF EXPORT ──
+function openPdfModal(){
+  document.getElementById('pdfModal').classList.add('on');
+}
+function closePdfModal(){
+  document.getElementById('pdfModal').classList.remove('on');
+}
+
+function generatePDF(){
+  var scope = document.querySelector('input[name="pdfScope"]:checked').value;
+  closePdfModal();
+
+  // Collapse sections based on scope
+  applyPdfScope(scope);
+
+  // Inject sprint info header for print
+  injectPrintHeader();
+
+  // Switch to light mode for better PDF quality (save user preference)
+  var wasLight = !isDark;
+  if(isDark){
+    isDark=false;
+    document.getElementById('root').classList.add('light');
+    document.getElementById('thBtn').textContent='Dark mode';
+    if(raw) render(process(raw,cur));
+  }
+
+  // Wait for charts to re-render then print
+  setTimeout(function(){
+    window.print();
+    // After print dialog closes, restore
+    setTimeout(function(){
+      removePdfScope();
+      removePrintHeader();
+      if(!wasLight){
+        isDark=true;
+        document.getElementById('root').classList.remove('light');
+        document.getElementById('thBtn').textContent='Light mode';
+        if(raw) render(process(raw,cur));
+      }
+    }, 500);
+  }, 600);
+}
+
+function applyPdfScope(scope){
+  // Section IDs/selectors to show/hide per scope
+  var allSections = document.querySelectorAll('.sec, #goalsS, #sprintGoalBox, #impactS, #subS, #bugsS, #carryS, #backlogS, #perfS, #eS, #retroS, #starsS, #drainS, .g2, .krow, .sp-card');
+
+  if(scope === 'summary'){
+    // Hide: burndown, area, individual, scope, effort, impact, spillovers, subtasks, bugs, assignee charts, early, retro
+    var hide = ['#bC', '#aC', '#indvC', '#scB', '#dC', '#impactS', '#carryS', '#backlogS', '#subS', '#bugsS', '#cC', '#eS', '#retroS', '#starsS', '#drainS'];
+    hide.forEach(function(sel){
+      var el = document.querySelector(sel);
+      if(el){
+        var card = el.closest('.cc') || el.closest('.g2') || el;
+        card.setAttribute('data-pdf-hidden', '1');
+        card.style.display='none';
+      }
+    });
+    // Also hide "sec" headers for hidden sections
+    var secsToHide = ['Burndown', 'Time logs', 'Spillovers', 'Subtask breakdown', 'Bugs and polish', 'Early completions', 'Sprint retrospective'];
+    document.querySelectorAll('.sec').forEach(function(s){
+      secsToHide.forEach(function(h){
+        if(s.textContent.indexOf(h) !== -1){
+          s.setAttribute('data-pdf-hidden', '1');
+          s.style.display='none';
+        }
+      });
+    });
+  } else if(scope === 'retro'){
+    // Keep only: sprint goal + retrospective + sprint progress header
+    var keepSecs = ['Sprint goal', 'Sprint retrospective'];
+    document.querySelectorAll('.sec').forEach(function(s){
+      var keep = false;
+      keepSecs.forEach(function(k){ if(s.textContent.indexOf(k) !== -1) keep = true; });
+      if(!keep){
+        s.setAttribute('data-pdf-hidden', '1');
+        s.style.display='none';
+      }
+    });
+    // Hide everything else
+    var hideSelectors = ['.krow', '.sp-card', '.cc', '.g2', '.early-grid', '#starsS', '#drainS', '#perfS'];
+    hideSelectors.forEach(function(sel){
+      document.querySelectorAll(sel).forEach(function(el){
+        // Don't hide if it's the sprint goal or retro container
+        if(el.id === 'sprintGoalBox' || el.id === 'retroS') return;
+        if(el.querySelector && (el.querySelector('#sprintGoalBox') || el.querySelector('#retroS'))) return;
+        el.setAttribute('data-pdf-hidden', '1');
+        el.style.display='none';
+      });
+    });
+  }
+  // Full: don't hide anything
+}
+
+function removePdfScope(){
+  document.querySelectorAll('[data-pdf-hidden]').forEach(function(el){
+    el.style.display='';
+    el.removeAttribute('data-pdf-hidden');
+  });
+}
+
+function injectPrintHeader(){
+  // Add a visible sprint info block that shows in PDF
+  var existing = document.getElementById('pdfHeader');
+  if(existing) existing.remove();
+  var sel = document.getElementById('spSel');
+  var sprintText = sel && sel.options[sel.selectedIndex] ? sel.options[sel.selectedIndex].textContent : cur;
+  var userName = window._userName || window._userEmail || '';
+  var hdr = document.createElement('div');
+  hdr.id = 'pdfHeader';
+  hdr.className = 'pdf-sprint-info';
+  hdr.style.cssText = 'display:none;padding:10px 0;border-bottom:1px solid #ccc;margin-bottom:14px';
+  hdr.innerHTML = '<div style="font-size:16px;font-weight:600;color:#000">Sprint Report — ' + sprintText + '</div>'
+    + '<div style="font-size:11px;color:#555;margin-top:3px">Exported by ' + userName + ' on ' + new Date().toLocaleString() + ' · Playspare MSS Team</div>';
+  var brand = document.querySelector('.brand');
+  if(brand) brand.parentNode.insertBefore(hdr, brand.nextSibling);
+}
+
+function removePrintHeader(){
+  var hdr = document.getElementById('pdfHeader');
+  if(hdr) hdr.remove();
+}
+
+// Close modal on outside click
+document.getElementById('pdfModal').addEventListener('click', function(e){
+  if(e.target === this) closePdfModal();
+});
+
+// PDF button handler
+document.getElementById('pdfBtn').addEventListener('click', openPdfModal);
 
 // ── On page load ──
 (function bootstrap(){
