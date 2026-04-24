@@ -598,7 +598,7 @@ select{background:var(--sur);color:var(--text);border:0.5px solid var(--bor);bor
 </div>
 
 <script>
-var API='https://script.google.com/macros/s/AKfycbycEwYUPGF-3DkOzwIQ2K6efMjweepSLjAu9CRNgowA198Z8pUXjqM31AopSRNP-tMH4A/exec';
+var API='https://script.google.com/macros/s/AKfycbxLnHe5-F1JWcovwVmRAbJ6ll-pdP1kdhHkBIKRorPBauDHDg7knEKVRC5wSUUfOOypAw/exec';
 var CH={},isDark=true,raw=null,cur=null,curTeam='All',curIndvTeam='All';
 var TC=['#5b6ef5','#18c97a','#9b72f5','#f5a623','#f05252','#22c4c4','#0aaa62'];
 var TEAM_COLORS={};
@@ -759,30 +759,36 @@ function process(json,spId){
   });
 
   // Sprint structure:
-  //   Start date = Day 0 (planning day, excluded from dTot)
-  //   Day 1 to Day N = working days
-  //   End date = Day N+1 (review/demo day, excluded)
+  //   Start date  = D0 (planning day, no work logged)
+  //   D1..DN     = working days, including end date
+  //   End date   = LAST working day (inclusive, not excluded)
   //
   // Example: 13 Apr to 24 Apr → 11 calendar days
-  //   D0=13 Apr (planning), D1-D10=working, 24 Apr=end/review
-  //   dTot = 10 working days
+  //   D0 = 13 Apr (planning)
+  //   D1 = 14 Apr
+  //   ...
+  //   D11 = 24 Apr (last working day)
+  //   Sprint completes AFTER end of 24 Apr
+  //   dTot = 11 working days
   //
   // dDone = fully elapsed working days (strictly BEFORE today)
   var sd=pd(spInfo.start),ed=pd(spInfo.end),now=new Date();
   var dTot=0,dDone=0;
   if(sd&&ed){
-    // Calendar days between start and end (inclusive spans)
+    // Calendar span (end - start, end inclusive = calDays working days after D0)
     var calDays = Math.round((ed-sd)/864e5);
-    // Working days = calendar days minus D0 (planning)
-    // For a standard sprint (start to end both inclusive) this gives actual work days
-    dTot = Math.max(1, calDays - 1);
+    // Working days = calendar days (end date is included as last working day)
+    dTot = Math.max(1, calDays);
     // How many working days have fully elapsed (today is still in progress)
     var todayStart=new Date(now.getFullYear(),now.getMonth(),now.getDate());
     var daysSinceStart=Math.floor((todayStart-sd)/864e5);
-    // daysSinceStart=0 → D0 (planning, dDone=0)
-    // daysSinceStart=1 → D1 today (dDone=0)
-    // daysSinceStart=2 → D2 today, D1 elapsed (dDone=1)
+    // daysSinceStart=0 → D0 today (planning, dDone=0)
+    // daysSinceStart=1 → D1 today (dDone=0, D1 in progress)
+    // daysSinceStart=N → DN today (dDone=N-1, D1..D(N-1) elapsed)
     dDone=Math.max(0,Math.min(dTot,daysSinceStart-1));
+    // Sprint "complete" only when we pass the end date
+    // If today > end date → all days elapsed
+    if(todayStart > ed) dDone = dTot;
   }
 
   // Burndown: D0 (planning, full est) + D1..Dn (working days)
@@ -995,7 +1001,7 @@ function shell(){
   +'<div class="leg"><span class="li"><span class="lsq" style="background:#9b72f5"></span>Est. time</span>'
   +'<span class="li"><span class="lsq" style="background:#18c97a"></span>Time logged (under)</span>'
   +'<span class="li"><span class="lsq" style="background:#f05252"></span>Time logged (overtime)</span></div>'
-  +'<div id="indvWrap" style="position:relative"><canvas id="indvC"></canvas></div>'
+  +'<div id="indvWrap" style="position:relative;min-height:300px"><canvas id="indvC" style="cursor:pointer"></canvas></div>'
   +'<div id="bdBox" style="display:none;margin-top:20px;background:var(--sur2);padding:16px;border-radius:10px;border:1px solid var(--acc)"></div>'
   +'</div>'
   +'<div class="g2">'
@@ -1447,13 +1453,34 @@ function doIndividual(d,tf){
     options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,
       plugins:{legend:{display:false},tooltip:{enabled:false}},
       onClick: function(e, elements, chart){
-        // Get element at click position
-        var points = chart.getElementsAtEventForMode(e, 'nearest', {intersect: false, axis: 'y'}, false);
-        if(points.length === 0) return;
+        // Try multiple detection modes for robustness
+        var points = chart.getElementsAtEventForMode(e, 'nearest', {intersect:true, axis:'y'}, false);
+        if(points.length === 0){
+          points = chart.getElementsAtEventForMode(e, 'index', {intersect:false, axis:'y'}, false);
+        }
+        if(points.length === 0){
+          // Fallback: compute from mouse y-position
+          var rect = chart.canvas.getBoundingClientRect();
+          var mouseY = (e.native ? e.native.clientY : e.clientY) - rect.top;
+          var yScale = chart.scales.y;
+          if(yScale){
+            for(var i = 0; i < names.length; i++){
+              var py = yScale.getPixelForValue(i);
+              if(Math.abs(mouseY - py) < 25){
+                points = [{index: i}];
+                break;
+              }
+            }
+          }
+        }
+        if(points.length === 0){
+          console.log('[INDV CLICK] No bar detected at click position');
+          return;
+        }
         var idx = points[0].index;
         var asn = names[idx];
         var fullD = window._sprintData || d;
-        console.log('[INDV CLICK]', asn, 'tasks:', (fullD.tasks||[]).filter(function(t){return(t.assignee||'')===asn;}).length);
+        console.log('[INDV CLICK]', asn, '- tasks:', (fullD.tasks||[]).filter(function(t){return(t.assignee||'')===asn;}).length);
         showBreakdown(asn, fullD);
       },
       scales:{x:{grid:{color:c.grid},ticks:{color:c.text,font:{size:10}},title:{display:true,text:'Hours',color:c.text,font:{size:10}}},
@@ -2181,7 +2208,7 @@ var _atdSearchQuery = '';
 function doAssigneeTaskDetail(d){
   var tabsEl = document.getElementById('atdTabs');
   if(!tabsEl) return;
-  console.log('[ATD] Called with', d.tasks?.length || 0, 'tasks,', d.subtasks?.length || 0, 'subtasks');
+  console.log('[ATD] Called with', (d.tasks||[]).length, 'tasks,', (d.subtasks||[]).length, 'subtasks, teamFilter:', _atdTeamFilter, 'search:', _atdSearchQuery);
 
   // Build team tabs
   var teams = ['All'].concat((d.teams||[]).map(function(t){return t.n;}));
@@ -2256,14 +2283,22 @@ function renderATDList(d){
   arr = arr.filter(function(a){ return a.name !== 'Unassigned' || a.tasks.length > 0; });
 
   if(!arr.length){
-    // Debug info to understand why empty
-    var debug = 'No members match your filter.';
+    var msg;
     if(Object.keys(byAsn).length === 0){
-      debug = 'No task data found for this sprint. Check if data has loaded.';
+      msg = '<div class="atd-empty">No task data found for this sprint.</div>';
     } else {
-      debug = 'No members match filter (team: '+_atdTeamFilter+', search: "'+_atdSearchQuery+'"). Total members in data: '+Object.keys(byAsn).length+'.';
+      var hasFilters = _atdTeamFilter !== 'All' || _atdSearchQuery;
+      if(hasFilters){
+        msg = '<div class="atd-empty">'
+          + '<div>No members match your filters</div>'
+          + '<div style="font-size:10px;margin-top:6px;color:var(--mut)">Team: <b>'+_atdTeamFilter+'</b> · Search: "<b>'+(_atdSearchQuery||'(none)')+'</b>"</div>'
+          + '<button class="btn" style="margin-top:12px" onclick="clearATDFilters()">Clear filters</button>'
+          + '</div>';
+      } else {
+        msg = '<div class="atd-empty">No assignees in this sprint.</div>';
+      }
     }
-    listEl.innerHTML = '<div class="atd-empty">'+debug+'</div>';
+    listEl.innerHTML = msg;
     return;
   }
 
@@ -2336,6 +2371,18 @@ function renderATDList(d){
       + '<div class="atd-tasks" onclick="event.stopPropagation()">'+taskRows+'</div>'
       + '</div>';
   }).join('');
+}
+
+function clearATDFilters(){
+  _atdTeamFilter = 'All';
+  _atdSearchQuery = '';
+  var searchEl = document.getElementById('atdSearch');
+  if(searchEl) searchEl.value = '';
+  // Update active tab
+  document.querySelectorAll('#atdTabs [data-atd]').forEach(function(el){
+    el.classList.toggle('on', el.dataset.atd === 'All');
+  });
+  if(window._sprintData) renderATDList(window._sprintData);
 }
 
 // ── USERS PAGE ──
