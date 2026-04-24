@@ -12,18 +12,21 @@ body{font-family:system-ui,-apple-system,sans-serif;font-size:13px;transition:ba
 /* ── SIDEBAR LAYOUT ── */
 .app-shell{display:flex;min-height:100vh;background:var(--bg)}
 .sidebar{width:240px;background:var(--sur);border-right:0.5px solid var(--bor);display:flex;flex-direction:column;flex-shrink:0;position:sticky;top:0;height:100vh;overflow-y:auto;transition:width .2s ease;overflow-x:hidden}
-.sidebar.collapsed{width:60px}
+.sidebar.collapsed{width:56px}
 .sidebar.collapsed .sb-brand,
 .sidebar.collapsed .sb-group,
 .sidebar.collapsed .sb-item span:not(.sb-icon),
 .sidebar.collapsed .sb-user-info{display:none}
-.sidebar.collapsed .sb-header{justify-content:center;padding:18px 8px}
-.sidebar.collapsed .sb-nav{padding:14px 6px}
-.sidebar.collapsed .sb-item{justify-content:center;padding:10px 8px}
-.sidebar.collapsed .sb-footer{padding:10px 8px;flex-direction:column;gap:6px}
+.sidebar.collapsed .sb-header{justify-content:center;padding:14px 6px}
+.sidebar.collapsed .sb-logo{width:30px;height:30px;font-size:12px}
+.sidebar.collapsed .sb-nav{padding:10px 4px}
+.sidebar.collapsed .sb-item{justify-content:center;padding:9px 6px;margin-bottom:3px}
+.sidebar.collapsed .sb-footer{padding:8px 6px;flex-direction:column;gap:4px;align-items:center}
 .sidebar.collapsed .sb-user{justify-content:center}
-.sidebar.collapsed .sb-logout{width:38px}
+.sidebar.collapsed .sb-avatar{width:30px;height:30px;font-size:12px}
+.sidebar.collapsed .sb-logout{width:32px;height:32px;padding:0}
 .sidebar.collapsed .sb-item.on{background:rgba(91,110,245,.18)}
+.sidebar.collapsed .sb-icon{font-size:16px}
 /* Tooltip on hover when collapsed */
 .sidebar.collapsed .sb-item{position:relative}
 .sidebar.collapsed .sb-item:hover::after{
@@ -70,7 +73,7 @@ body{font-family:system-ui,-apple-system,sans-serif;font-size:13px;transition:ba
 .page-sub{font-size:11px;color:var(--mut);margin-top:2px}
 .main-actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
 .sprint-select{background:var(--sur2);color:var(--text);border:0.5px solid var(--bor);border-radius:7px;padding:6px 10px;font-size:11px;cursor:pointer;outline:none;min-width:180px}
-.page-content{flex:1;padding:22px;overflow-y:auto;max-width:1200px;margin:0 auto;width:100%}
+.page-content{flex:1;padding:22px 28px;overflow-y:auto;width:100%;box-sizing:border-box}
 
 /* Hide old wrap class */
 .wrap{max-width:none;padding:0;margin:0}
@@ -620,7 +623,7 @@ select{background:var(--sur);color:var(--text);border:0.5px solid var(--bor);bor
 </div>
 
 <script>
-var API='https://script.google.com/macros/s/AKfycbyqNH3n0X3Y4nYtnwk81xMRINX6TooDvI7a7Q00MPqZiAZmhYX80m90GJKeGymWVtCI/exec';
+var API='https://script.google.com/macros/s/AKfycbyVEEcfTosOeeq42DhczhWxX4IqlGww_jdN1hR-Oiw-LycO3YU1BekP0WLuqqisVJTMJA/exec';
 var CH={},isDark=true,raw=null,cur=null,curTeam='All',curIndvTeam='All';
 var TC=['#5b6ef5','#18c97a','#9b72f5','#f5a623','#f05252','#22c4c4','#0aaa62'];
 var TEAM_COLORS={};
@@ -1489,35 +1492,33 @@ function doIndividual(d,tf){
     ]},
     options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,
       plugins:{legend:{display:false},tooltip:{enabled:false}},
-      onClick: function(e, elements, chart){
-        // Try multiple detection modes for robustness
-        var points = chart.getElementsAtEventForMode(e, 'nearest', {intersect:true, axis:'y'}, false);
-        if(points.length === 0){
-          points = chart.getElementsAtEventForMode(e, 'index', {intersect:false, axis:'y'}, false);
+      onClick: function(e, _elements, chart){
+        // Use canvas-relative coordinates to find which bar was clicked
+        var rect = chart.canvas.getBoundingClientRect();
+        var mouseY = (e.native ? e.native.clientY : e.y) - rect.top;
+        var yScale = chart.scales.y;
+        if(!yScale) return;
+        // Find closest y-axis index by pixel distance
+        var closestIdx = -1;
+        var minDist = Infinity;
+        for(var i = 0; i < names.length; i++){
+          var py = yScale.getPixelForValue(i);
+          var dist = Math.abs(mouseY - py);
+          if(dist < minDist){ minDist = dist; closestIdx = i; }
         }
-        if(points.length === 0){
-          // Fallback: compute from mouse y-position
-          var rect = chart.canvas.getBoundingClientRect();
-          var mouseY = (e.native ? e.native.clientY : e.clientY) - rect.top;
-          var yScale = chart.scales.y;
-          if(yScale){
-            for(var i = 0; i < names.length; i++){
-              var py = yScale.getPixelForValue(i);
-              if(Math.abs(mouseY - py) < 25){
-                points = [{index: i}];
-                break;
-              }
-            }
-          }
-        }
-        if(points.length === 0){
-          console.log('[INDV CLICK] No bar detected at click position');
+        // Require within reasonable distance (30px tolerance)
+        if(closestIdx < 0 || minDist > 30){
+          console.log('[INDV CLICK] No bar within range (minDist=' + minDist + ')');
           return;
         }
-        var idx = points[0].index;
-        var asn = names[idx];
-        var fullD = window._sprintData || d;
-        console.log('[INDV CLICK]', asn, '- tasks:', (fullD.tasks||[]).filter(function(t){return(t.assignee||'')===asn;}).length);
+        var asn = names[closestIdx];
+        var fullD = window._sprintData;
+        if(!fullD || !fullD.tasks){
+          console.log('[INDV CLICK] No sprint data available');
+          return;
+        }
+        var taskCount = fullD.tasks.filter(function(t){return(t.assignee||'')===asn;}).length;
+        console.log('[INDV CLICK]', asn, '-', taskCount, 'tasks');
         showBreakdown(asn, fullD);
       },
       scales:{x:{grid:{color:c.grid},ticks:{color:c.text,font:{size:10}},title:{display:true,text:'Hours',color:c.text,font:{size:10}}},
@@ -2245,7 +2246,10 @@ var _atdSearchQuery = '';
 function doAssigneeTaskDetail(d){
   var tabsEl = document.getElementById('atdTabs');
   if(!tabsEl) return;
-  console.log('[ATD] Called with', (d.tasks||[]).length, 'tasks,', (d.subtasks||[]).length, 'subtasks, teamFilter:', _atdTeamFilter, 'search:', _atdSearchQuery);
+  console.log('[ATD] Called - tasks:', (d.tasks||[]).length, 'subtasks:', (d.subtasks||[]).length, 'filter:', _atdTeamFilter, 'search:', _atdSearchQuery);
+  if((d.tasks||[]).length > 0){
+    console.log('[ATD] First task sample:', d.tasks[0].taskName, '| assignee:', d.tasks[0].assignee, '| team:', d.tasks[0].teamCategory);
+  }
 
   // Build team tabs
   var teams = ['All'].concat((d.teams||[]).map(function(t){return t.n;}));
@@ -2316,8 +2320,8 @@ function renderATDList(d){
   // Sort: most est hours first
   arr.sort(function(a,b){ return b.totEst - a.totEst; });
 
-  // Remove Unassigned if empty
-  arr = arr.filter(function(a){ return a.name !== 'Unassigned' || a.tasks.length > 0; });
+  // Filter out Unassigned always (not a real person)
+  arr = arr.filter(function(a){ return a.name !== 'Unassigned'; });
 
   if(!arr.length){
     var msg;
