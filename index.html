@@ -11,8 +11,30 @@ body{font-family:system-ui,-apple-system,sans-serif;font-size:13px;transition:ba
 
 /* ── SIDEBAR LAYOUT ── */
 .app-shell{display:flex;min-height:100vh;background:var(--bg)}
-.sidebar{width:240px;background:var(--sur);border-right:0.5px solid var(--bor);display:flex;flex-direction:column;flex-shrink:0;position:sticky;top:0;height:100vh;overflow-y:auto;transition:width .2s,transform .2s}
-.sidebar.collapsed{width:0;overflow:hidden}
+.sidebar{width:240px;background:var(--sur);border-right:0.5px solid var(--bor);display:flex;flex-direction:column;flex-shrink:0;position:sticky;top:0;height:100vh;overflow-y:auto;transition:width .2s ease;overflow-x:hidden}
+.sidebar.collapsed{width:60px}
+.sidebar.collapsed .sb-brand,
+.sidebar.collapsed .sb-group,
+.sidebar.collapsed .sb-item span:not(.sb-icon),
+.sidebar.collapsed .sb-user-info{display:none}
+.sidebar.collapsed .sb-header{justify-content:center;padding:18px 8px}
+.sidebar.collapsed .sb-nav{padding:14px 6px}
+.sidebar.collapsed .sb-item{justify-content:center;padding:10px 8px}
+.sidebar.collapsed .sb-footer{padding:10px 8px;flex-direction:column;gap:6px}
+.sidebar.collapsed .sb-user{justify-content:center}
+.sidebar.collapsed .sb-logout{width:38px}
+.sidebar.collapsed .sb-item.on{background:rgba(91,110,245,.18)}
+/* Tooltip on hover when collapsed */
+.sidebar.collapsed .sb-item{position:relative}
+.sidebar.collapsed .sb-item:hover::after{
+  content:attr(data-label);
+  position:absolute;left:100%;top:50%;transform:translateY(-50%);
+  background:var(--sur2);color:var(--text);
+  padding:6px 10px;border-radius:6px;font-size:11px;font-weight:500;
+  white-space:nowrap;margin-left:8px;z-index:1000;
+  box-shadow:0 2px 8px rgba(0,0,0,.3);border:0.5px solid var(--bor);
+  pointer-events:none;
+}
 .sb-header{padding:18px 16px;border-bottom:0.5px solid var(--bor);display:flex;align-items:center;gap:10px}
 .sb-logo{width:34px;height:34px;border-radius:8px;background:linear-gradient(135deg,var(--acc),var(--pur));display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:13px;flex-shrink:0}
 .sb-brand{overflow:hidden}
@@ -498,18 +520,18 @@ select{background:var(--sur);color:var(--text);border:0.5px solid var(--bor);bor
 
     <nav class="sb-nav">
       <div class="sb-group">Sprint</div>
-      <a class="sb-item on" data-page="overview"><span class="sb-icon">📊</span>Overview</a>
-      <a class="sb-item" data-page="goals"><span class="sb-icon">🎯</span>Goals</a>
-      <a class="sb-item" data-page="burndown"><span class="sb-icon">🔥</span>Burndown</a>
-      <a class="sb-item" data-page="team"><span class="sb-icon">👥</span>Team</a>
-      <a class="sb-item" data-page="bugs"><span class="sb-icon">🐛</span>Bugs</a>
-      <a class="sb-item" data-page="spillovers"><span class="sb-icon">🔄</span>Spillovers</a>
-      <a class="sb-item" data-page="retro"><span class="sb-icon">📝</span>Retrospective</a>
-      <a class="sb-item" data-page="performance"><span class="sb-icon">🏆</span>Performance</a>
+      <a class="sb-item on" data-page="overview" data-label="Overview"><span class="sb-icon">📊</span>Overview</a>
+      <a class="sb-item" data-page="goals" data-label="Goals"><span class="sb-icon">🎯</span>Goals</a>
+      <a class="sb-item" data-page="burndown" data-label="Burndown"><span class="sb-icon">🔥</span>Burndown</a>
+      <a class="sb-item" data-page="team" data-label="Team"><span class="sb-icon">👥</span>Team</a>
+      <a class="sb-item" data-page="bugs" data-label="Bugs"><span class="sb-icon">🐛</span>Bugs</a>
+      <a class="sb-item" data-page="spillovers" data-label="Spillovers"><span class="sb-icon">🔄</span>Spillovers</a>
+      <a class="sb-item" data-page="retro" data-label="Retrospective"><span class="sb-icon">📝</span>Retrospective</a>
+      <a class="sb-item" data-page="performance" data-label="Performance"><span class="sb-icon">🏆</span>Performance</a>
 
       <div class="sb-group">Admin</div>
-      <a class="sb-item" data-page="users" id="nav-users"><span class="sb-icon">👤</span>Users</a>
-      <a class="sb-item" data-page="settings"><span class="sb-icon">⚙️</span>Settings</a>
+      <a class="sb-item" data-page="users" data-label="Users" id="nav-users"><span class="sb-icon">👤</span>Users</a>
+      <a class="sb-item" data-page="settings" data-label="Settings"><span class="sb-icon">⚙️</span>Settings</a>
     </nav>
 
     <div class="sb-footer">
@@ -598,7 +620,7 @@ select{background:var(--sur);color:var(--text);border:0.5px solid var(--bor);bor
 </div>
 
 <script>
-var API='https://script.google.com/macros/s/AKfycbxRynjijNgS84vwworstlj0QzCdTUMIK_oIFDzq9kAniKV8mIrGhervz1VqNXiY5mDYjA/exec';
+var API='https://script.google.com/macros/s/AKfycbxLnHe5-F1JWcovwVmRAbJ6ll-pdP1kdhHkBIKRorPBauDHDg7knEKVRC5wSUUfOOypAw/exec';
 var CH={},isDark=true,raw=null,cur=null,curTeam='All',curIndvTeam='All';
 var TC=['#5b6ef5','#18c97a','#9b72f5','#f5a623','#f05252','#22c4c4','#0aaa62'];
 var TEAM_COLORS={};
@@ -758,37 +780,52 @@ function process(json,spId){
     a.est=rnd(a.est); a.log=rnd(a.log);
   });
 
-  // Sprint structure:
-  //   Start date  = D0 (planning day, no work logged)
-  //   D1..DN     = working days, including end date
-  //   End date   = LAST working day (inclusive, not excluded)
+  // Sprint structure (weekends excluded — Mon-Fri only):
+  //   Start date  = D0 (planning day)
+  //   D1..DN     = working weekdays after D0, up to end date
   //
-  // Example: 13 Apr to 24 Apr → 11 calendar days
-  //   D0 = 13 Apr (planning)
-  //   D1 = 14 Apr
-  //   ...
-  //   D11 = 24 Apr (last working day)
-  //   Sprint completes AFTER end of 24 Apr
-  //   dTot = 11 working days
+  // Example: Mon 13 Apr → Fri 24 Apr
+  //   D0 = Mon 13 Apr (planning)
+  //   D1 = Tue 14 Apr, D2 = Wed 15 Apr, D3 = Thu 16 Apr, D4 = Fri 17 Apr
+  //   Sat 18 + Sun 19 SKIPPED
+  //   D5 = Mon 20 Apr, D6 = Tue 21, D7 = Wed 22, D8 = Thu 23, D9 = Fri 24
+  //   dTot = 9 working days
   //
   // dDone = fully elapsed working days (strictly BEFORE today)
+  function isWeekend(d){ var w=d.getDay(); return w===0||w===6; }  // Sun=0, Sat=6
+  function countWeekdays(from, to){
+    // Count weekdays from 'from' (exclusive) up to 'to' (inclusive)
+    if(!from||!to||to<from) return 0;
+    var count=0;
+    var cur = new Date(from.getFullYear(), from.getMonth(), from.getDate());
+    cur.setDate(cur.getDate()+1);
+    while(cur <= to){
+      if(!isWeekend(cur)) count++;
+      cur.setDate(cur.getDate()+1);
+    }
+    return count;
+  }
+
   var sd=pd(spInfo.start),ed=pd(spInfo.end),now=new Date();
   var dTot=0,dDone=0;
   if(sd&&ed){
-    // Calendar span (end - start, end inclusive = calDays working days after D0)
-    var calDays = Math.round((ed-sd)/864e5);
-    // Working days = calendar days (end date is included as last working day)
-    dTot = Math.max(1, calDays);
-    // How many working days have fully elapsed (today is still in progress)
+    // Working days after D0 (start is D0), up to and including end
+    dTot = Math.max(1, countWeekdays(sd, ed));
     var todayStart=new Date(now.getFullYear(),now.getMonth(),now.getDate());
-    var daysSinceStart=Math.floor((todayStart-sd)/864e5);
-    // daysSinceStart=0 → D0 today (planning, dDone=0)
-    // daysSinceStart=1 → D1 today (dDone=0, D1 in progress)
-    // daysSinceStart=N → DN today (dDone=N-1, D1..D(N-1) elapsed)
-    dDone=Math.max(0,Math.min(dTot,daysSinceStart-1));
-    // Sprint "complete" only when we pass the end date
-    // If today > end date → all days elapsed
-    if(todayStart > ed) dDone = dTot;
+    // Fully elapsed working days — count weekdays from day AFTER start
+    // up to but NOT including today (today is in progress)
+    if(todayStart <= sd){
+      // Sprint not started yet
+      dDone = 0;
+    } else if(todayStart > ed){
+      // Sprint ended — all done
+      dDone = dTot;
+    } else {
+      // Working: count full weekdays strictly before today (after start)
+      var prevDay = new Date(todayStart);
+      prevDay.setDate(prevDay.getDate()-1);
+      dDone = Math.min(dTot, countWeekdays(sd, prevDay));
+    }
   }
 
   // Burndown: D0 (planning, full est) + D1..Dn (working days)
@@ -2567,6 +2604,8 @@ function toggleSidebar(){
     sb.classList.toggle('open');
   } else {
     sb.classList.toggle('collapsed');
+    // Save preference
+    localStorage.setItem('sidebarCollapsed', sb.classList.contains('collapsed') ? '1' : '0');
   }
 }
 
@@ -2714,6 +2753,10 @@ function showDashboard(name){
   }
   // Apply saved theme
   applyTheme(localStorage.getItem('themePref') || 'dark');
+  // Restore sidebar collapsed state
+  if(localStorage.getItem('sidebarCollapsed') === '1' && window.innerWidth > 860){
+    document.getElementById('sidebar').classList.add('collapsed');
+  }
   // Setup sidebar click handlers
   setupSidebar();
   init();
