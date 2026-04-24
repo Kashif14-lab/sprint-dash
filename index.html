@@ -456,7 +456,7 @@ select{background:var(--sur);color:var(--text);border:0.5px solid var(--bor);bor
 
 /* ── SPRINT PROGRESS — Active Day Dot ── */
 .dp{position:relative}
-.dp.active-day{background:var(--sur2) !important;color:var(--acc) !important;opacity:1 !important;font-weight:600;border-left:3px solid var(--acc) !important;border-right:3px solid var(--acc) !important;border-top:none !important;border-bottom:none !important}
+.dp.active-day{outline:2px solid var(--acc);outline-offset:2px;font-weight:700;z-index:1}
 
 @media(max-width:720px){
   .krow{grid-template-columns:repeat(2,1fr)}
@@ -598,7 +598,7 @@ select{background:var(--sur);color:var(--text);border:0.5px solid var(--bor);bor
 </div>
 
 <script>
-var API='https://script.google.com/macros/s/AKfycbz12esvdt2Fh_X6OkuWPiPQowye4mDU_NK-qq4mGg5BqAJU2fqJ7vKBxsL1Pjm00QAUSQ/exec';
+var API='https://script.google.com/macros/s/AKfycbxLnHe5-F1JWcovwVmRAbJ6ll-pdP1kdhHkBIKRorPBauDHDg7knEKVRC5wSUUfOOypAw/exec';
 var CH={},isDark=true,raw=null,cur=null,curTeam='All',curIndvTeam='All';
 var TC=['#5b6ef5','#18c97a','#9b72f5','#f5a623','#f05252','#22c4c4','#0aaa62'];
 var TEAM_COLORS={};
@@ -758,29 +758,47 @@ function process(json,spId){
     a.est=rnd(a.est); a.log=rnd(a.log);
   });
 
-  // Start date = Day 0 (planning, excluded). Day 1 = start+1. End date inclusive.
-  // dDone = fully elapsed work days (strictly BEFORE today). Today is "in progress".
+  // Sprint structure:
+  //   Start date = Day 0 (planning day, excluded from dTot)
+  //   Day 1 to Day N = working days
+  //   End date = Day N+1 (review/demo day, excluded)
+  //
+  // Example: 13 Apr to 24 Apr → 11 calendar days
+  //   D0=13 Apr (planning), D1-D10=working, 24 Apr=end/review
+  //   dTot = 10 working days
+  //
+  // dDone = fully elapsed working days (strictly BEFORE today)
   var sd=pd(spInfo.start),ed=pd(spInfo.end),now=new Date();
   var dTot=0,dDone=0;
   if(sd&&ed){
-    dTot=Math.max(1,Math.round((ed-sd)/864e5));
-    // Normalize today to start of day for accurate day math
+    // Calendar days between start and end (inclusive spans)
+    var calDays = Math.round((ed-sd)/864e5);
+    // Working days = calendar days minus D0 (planning)
+    // For a standard sprint (start to end both inclusive) this gives actual work days
+    dTot = Math.max(1, calDays - 1);
+    // How many working days have fully elapsed (today is still in progress)
     var todayStart=new Date(now.getFullYear(),now.getMonth(),now.getDate());
     var daysSinceStart=Math.floor((todayStart-sd)/864e5);
-    // Subtract 1 because today is a working day in progress (not yet elapsed)
-    // If daysSinceStart=0 (today=start=D0), dDone=0. daysSinceStart=1 (D1 today), dDone=0. etc.
+    // daysSinceStart=0 → D0 (planning, dDone=0)
+    // daysSinceStart=1 → D1 today (dDone=0)
+    // daysSinceStart=2 → D2 today, D1 elapsed (dDone=1)
     dDone=Math.max(0,Math.min(dTot,daysSinceStart-1));
   }
 
-  // Burndown: D0 = planning (full estimate), D1..Dn = working days
-  var burnDays=Math.min(dTot+1,16);
-  var step=totEst/(burnDays-1||1);
+  // Burndown: D0 (planning, full est) + D1..Dn (working days)
+  // burnDays = dTot + 1 → e.g. dTot=10 → 11 points (D0 to D10)
+  var burnDays=dTot+1;
+  var step=totEst/(dTot||1);
   var logPD=dDone>0?totLog/dDone:0;
   var bI=[],bA=[],bL=[];
   for(var i=0;i<burnDays;i++){
     bL.push('D'+i);
-    bI.push(rnd(totEst-step*i));
-    if(i<=dDone)bA.push(Math.max(0,rnd(totEst-logPD*i)));
+    // Ideal: flat at D0 (no work on planning), decrease from D1 onwards
+    if(i===0) bI.push(rnd(totEst));
+    else bI.push(rnd(Math.max(0, totEst-step*i)));
+    // Actual: up to today, flat at D0
+    if(i===0) bA.push(rnd(totEst));
+    else if(i<=dDone+1) bA.push(Math.max(0, rnd(totEst-logPD*(i-1))));
     else bA.push(null);
   }
 
@@ -860,6 +878,13 @@ function switchPage(page){
   // Reset breakdown box if leaving team page
   var bd = document.getElementById('bdBox');
   if(bd) bd.style.display = 'none';
+  // Reset ATD search when entering team page
+  if(page === 'team'){
+    _atdSearchQuery = '';
+    _atdTeamFilter = 'All';
+    var searchEl = document.getElementById('atdSearch');
+    if(searchEl) searchEl.value = '';
+  }
   // Update active nav
   document.querySelectorAll('.sb-item').forEach(function(el){
     el.classList.toggle('on', el.dataset.page === page);
@@ -1086,13 +1111,12 @@ function doProgress(d){
   var cells='<div class="dp" style="background:var(--sur2);color:var(--mut);border:1px dashed var(--bor);font-style:italic" title="Planning day (excluded)">D0</div>';
   for(var i=1;i<=Math.min(d.dTot,30);i++){
     var past=i<=d.dDone, today=i===d.dDone+1 && rem>0;
-    if(today){
-      // Active day — solid color + red pulsing dot (see CSS .active-day)
-      cells+='<div class="dp active-day" title="Today">D'+i+'</div>';
-    } else {
-      var bg=past?fc:'var(--sur2)';
-      cells+='<div class="dp" style="background:'+bg+';color:'+(past?'#fff':'var(--mut)')+'">D'+i+'</div>';
-    }
+    // Same style as other cells — just outline class for today
+    var bg=past||today?fc:'var(--sur2)';
+    var col=past||today?'#fff':'var(--mut)';
+    var cls=today?'dp active-day':'dp';
+    var title=today?' title="Today"':'';
+    cells+='<div class="'+cls+'" style="background:'+bg+';color:'+col+'"'+title+'>D'+i+'</div>';
   }
   document.getElementById('dRow').innerHTML=cells;
 
@@ -1334,17 +1358,23 @@ function doBurn(d){
   var days = d.dTot || 10;
 
   // Build ideal line — capacity-based
-  // Assumes work happens on all days (can be refined to working days later)
+  // D0 = planning (no work, flat at totEst)
+  // D1..Dn = work days, each consuming one day of team capacity
   var idealData = [];
   for(var i = 0; i < d.bL.length; i++){
-    var remaining = Math.max(0, d.totEst - (totalDailyCapacity * i));
+    var daysWorked = Math.max(0, i); // D0=0 days worked, D1=1, etc.
+    // Actually D0 = planning, so no work consumed. D1 end = 1 day of capacity used.
+    // Ideal remaining at start of Di = totEst - (capacity * (i))
+    // But for D0, no capacity used yet.
+    var capacityUsed = i === 0 ? 0 : totalDailyCapacity * i;
+    var remaining = Math.max(0, d.totEst - capacityUsed);
     idealData.push(rnd(remaining));
   }
 
   // Info text
   var infoEl = document.getElementById('burnCapInfo');
   if(infoEl){
-    var infoTxt = '<b>Team capacity:</b> '+totalDailyCapacity+' hrs/day ('+activeAsns.length+' members, '+days+' day sprint = '+rnd(totalDailyCapacity*days)+' total capacity hrs)';
+    var infoTxt = '<b>Team capacity:</b> '+totalDailyCapacity+' hrs/day ('+activeAsns.length+' members × '+days+' working days = '+rnd(totalDailyCapacity*days)+' total capacity hrs). D0 is planning day (excluded).';
     if(membersWithoutCapacity.length){
       infoTxt += '<br><span style="color:var(--amb)">Note: '+membersWithoutCapacity.length+' member(s) using default 6 hrs/day — set their hours in Users page.</span>';
     }
@@ -1416,10 +1446,14 @@ function doIndividual(d,tf){
     ]},
     options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,
       plugins:{legend:{display:false},tooltip:{enabled:false}},
-      onClick:function(e,elements){
-        if(elements.length===0) return;
-        var asn = names[elements[0].index];
+      onClick: function(e, elements, chart){
+        // Get element at click position
+        var points = chart.getElementsAtEventForMode(e, 'nearest', {intersect: false, axis: 'y'}, false);
+        if(points.length === 0) return;
+        var idx = points[0].index;
+        var asn = names[idx];
         var fullD = window._sprintData || d;
+        console.log('[INDV CLICK]', asn, 'tasks:', (fullD.tasks||[]).filter(function(t){return(t.assignee||'')===asn;}).length);
         showBreakdown(asn, fullD);
       },
       scales:{x:{grid:{color:c.grid},ticks:{color:c.text,font:{size:10}},title:{display:true,text:'Hours',color:c.text,font:{size:10}}},
@@ -2147,6 +2181,7 @@ var _atdSearchQuery = '';
 function doAssigneeTaskDetail(d){
   var tabsEl = document.getElementById('atdTabs');
   if(!tabsEl) return;
+  console.log('[ATD] Called with', d.tasks?.length || 0, 'tasks,', d.subtasks?.length || 0, 'subtasks');
 
   // Build team tabs
   var teams = ['All'].concat((d.teams||[]).map(function(t){return t.n;}));
@@ -2221,7 +2256,14 @@ function renderATDList(d){
   arr = arr.filter(function(a){ return a.name !== 'Unassigned' || a.tasks.length > 0; });
 
   if(!arr.length){
-    listEl.innerHTML = '<div class="atd-empty">No members match your filter.</div>';
+    // Debug info to understand why empty
+    var debug = 'No members match your filter.';
+    if(Object.keys(byAsn).length === 0){
+      debug = 'No task data found for this sprint. Check if data has loaded.';
+    } else {
+      debug = 'No members match filter (team: '+_atdTeamFilter+', search: "'+_atdSearchQuery+'"). Total members in data: '+Object.keys(byAsn).length+'.';
+    }
+    listEl.innerHTML = '<div class="atd-empty">'+debug+'</div>';
     return;
   }
 
