@@ -100,7 +100,7 @@ body{font-family:var(--font-body);font-size:13px;transition:background .3s,color
 .page-sub{font-size:11px;color:var(--mut);margin-top:2px}
 .main-actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
 .sprint-select{background:var(--sur2);color:var(--text);border:0.5px solid var(--bor);border-radius:7px;padding:6px 10px;font-size:11px;cursor:pointer;outline:none;min-width:180px}
-.page-content{flex:1;padding:22px 28px;overflow-y:auto;width:100%;box-sizing:border-box}
+.page-content{flex:1;padding:22px 28px;overflow-y:auto;width:100%;box-sizing:border-box;position:relative}
 
 /* Hide old wrap class */
 .wrap{max-width:none;padding:0;margin:0}
@@ -108,6 +108,44 @@ body{font-family:var(--font-body);font-size:13px;transition:background .3s,color
 /* Page visibility */
 .page{display:none}
 .page.active{display:block}
+
+/* ── OUTLINER MODE: stack multiple pages in one scroll with anchor dividers ── */
+.outliner-mode .page.active{scroll-margin-top:20px;position:relative;min-height:280px}
+.outliner-mode .page.active + .page.active{
+  margin-top:32px;
+  padding-top:28px;
+  border-top:1px dashed var(--bor);
+}
+.outliner-mode .page.active::before{
+  content:attr(data-section-label);
+  display:block;
+  font-family:var(--font-display);
+  font-size:11px;
+  font-weight:700;
+  color:var(--mut);
+  text-transform:uppercase;
+  letter-spacing:.12em;
+  margin-bottom:14px;
+  padding:4px 10px;
+  background:var(--sur2);
+  border:0.5px solid var(--bor);
+  border-left:3px solid var(--acc);
+  border-radius:0 6px 6px 0;
+  width:fit-content;
+}
+/* Skeleton shimmer for unrendered outliner sections — prevents jarring jump
+   when IntersectionObserver fires and content suddenly fills the empty space */
+.outliner-mode .page.active.lazy-pending::after{
+  content:'';
+  display:block;
+  height:200px;
+  border-radius:10px;
+  background:linear-gradient(90deg,var(--sur2) 0%,var(--sur) 50%,var(--sur2) 100%);
+  background-size:200% 100%;
+  animation:lazyShimmer 1.6s ease-in-out infinite;
+  opacity:.5;
+}
+@keyframes lazyShimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
 
 @media(max-width:860px){
   .sidebar{position:fixed;left:0;top:0;bottom:0;z-index:100;transform:translateX(-100%);box-shadow:0 4px 20px rgba(0,0,0,.3)}
@@ -739,7 +777,7 @@ select{background:var(--sur);color:var(--text);border:0.5px solid var(--bor);bor
 <!-- end of #root -->
 
 <script>
-var API='https://script.google.com/macros/s/AKfycbyhRCbAMZ44XGzyx6gCqoyPrfYy_yQlcWPB00AD5iqHMubjYTwvUmG9gEiZZjSIzlXt/exec';
+var API='https://script.google.com/macros/s/AKfycbzYb0Az2MxVyMyno0VjU31CTIJRlrz8SsN-g4Q0smH1W6_0bL46IdwE-Ix-CNXxiVoEQQ/exec';
 var CH={},isDark=true,raw=null,cur=null,curTeam='All',curIndvTeam='All';
 var TC=['#5b6ef5','#18c97a','#9b72f5','#f5a623','#f05252','#22c4c4','#0aaa62'];
 var TEAM_COLORS={};
@@ -812,6 +850,7 @@ function process(json,spId){
   var cTimes=[],early=[],unplanned=[],drainers=[],stars=[];
 
   // Unplanned = Feature Tag contains "Unplanned"
+  // Only the explicit Asana tag counts — everything else is planned.
   function isUnplanned(t){
     return (t.featureTag||'').toLowerCase().split(',').some(function(x){
       return x.trim().toLowerCase()==='unplanned';
@@ -1034,6 +1073,65 @@ var PAGES = {
   settings   : { title: 'Settings',       sub: 'Theme and preferences' },
 };
 
+// Outliner mode — these sections render together on one long scroll.
+// Sidebar items become smooth-scroll anchors instead of page switchers.
+// Charts inside each section are lazy-rendered via IntersectionObserver
+// (chart only initializes when its section approaches the viewport).
+// Users + Settings stay single-page (admin-only, alag mental context).
+var OUTLINER_PAGES = ['overview','goals','burndown','team','bugs','spillovers','retro','performance'];
+function isOutlinerPage(page){ return OUTLINER_PAGES.indexOf(page) !== -1; }
+
+// Tracks which outliner sections have been rendered in the current data cycle.
+// Cleared on every render(d) call (data refresh) so stale data doesn't linger.
+var _renderedPages = {};
+var _outlinerObserver = null;
+
+// Render an outliner section once per data cycle. Subsequent calls are no-ops
+// — keeps Chart.js destroy/recreate from firing on every scroll-into-view.
+function lazyRenderPage(pageId, d){
+  if(!d) d = window._sprintData;
+  if(!d) return;
+  if(_renderedPages[pageId]) return;
+  _renderedPages[pageId] = true;
+  var el = document.getElementById('page-' + pageId);
+  if(el) el.classList.remove('lazy-pending');
+  renderPage(pageId, d);
+}
+
+// Set up IntersectionObserver so each outliner section auto-renders when it
+// approaches the viewport. rootMargin:'400px' starts rendering before the user
+// actually sees it, so charts are ready by the time they scroll into view.
+function setupLazyRender(d){
+  if(_outlinerObserver){ try { _outlinerObserver.disconnect(); } catch(e){} _outlinerObserver = null; }
+  var pc = document.getElementById('mc');
+  if(!pc) return;
+
+  // Mark all outliner sections as pending (shimmer placeholder shows up).
+  // Sections already rendered in this cycle keep their content.
+  OUTLINER_PAGES.forEach(function(p){
+    var el = document.getElementById('page-' + p);
+    if(el && !_renderedPages[p]) el.classList.add('lazy-pending');
+  });
+
+  if(!('IntersectionObserver' in window)){
+    // Fallback for old browsers — render everything upfront
+    OUTLINER_PAGES.forEach(function(p){ lazyRenderPage(p, d); });
+    return;
+  }
+  _outlinerObserver = new IntersectionObserver(function(entries){
+    entries.forEach(function(entry){
+      if(!entry.isIntersecting) return;
+      var id = entry.target.id.replace('page-','');
+      if(isOutlinerPage(id)) lazyRenderPage(id, d);
+    });
+  }, { root: pc, rootMargin: '400px 0px 400px 0px', threshold: 0.01 });
+
+  OUTLINER_PAGES.forEach(function(p){
+    var el = document.getElementById('page-' + p);
+    if(el) _outlinerObserver.observe(el);
+  });
+}
+
 function switchPage(page){
   if(!PAGES[page]) page = 'overview';
   currentPage = page;
@@ -1054,19 +1152,116 @@ function switchPage(page){
   // Update title
   document.getElementById('pageTitle').textContent = PAGES[page].title;
   document.getElementById('pageSub').textContent = PAGES[page].sub;
-  // Show selected page, hide others
-  document.querySelectorAll('.page').forEach(function(el){
-    el.classList.toggle('active', el.id === 'page-' + page);
-  });
+
+  var pc = document.getElementById('mc');
+  var inOutliner    = isOutlinerPage(page);
+  var wasInOutliner = pc.classList.contains('outliner-mode');
+
+  if(inOutliner){
+    pc.classList.add('outliner-mode');
+    document.querySelectorAll('.page').forEach(function(el){
+      var id = el.id.replace('page-','');
+      el.classList.toggle('active', isOutlinerPage(id));
+    });
+  } else {
+    pc.classList.remove('outliner-mode');
+    document.querySelectorAll('.page').forEach(function(el){
+      el.classList.toggle('active', el.id === 'page-' + page);
+    });
+    pc.scrollTop = 0;
+  }
+
   // Close sidebar on mobile
   if(window.innerWidth <= 860){
     document.getElementById('sidebar').classList.remove('open');
   }
-  // Re-render if data exists (charts re-init properly when made visible)
-  if(raw && window._sprintData){
-    requestAnimationFrame(function(){
-      renderPage(page, window._sprintData);
+
+  // Helper: smooth-scroll to the clicked section (used after any render is done).
+  // Uses scrollIntoView which auto-finds the scrolling ancestor — simpler and
+  // more reliable than offsetTop math.
+  function scrollToClicked(){
+    var target = document.getElementById('page-' + page);
+    if(!target) return;
+    target.scrollIntoView({ behavior:'smooth', block:'start' });
+  }
+
+  if(inOutliner){
+    if(wasInOutliner){
+      // Already in outliner mode — make sure the target is rendered before
+      // scrolling to it (otherwise scrollIntoView lands at the wrong height
+      // because the placeholder min-height is shorter than the real content).
+      lazyRenderPage(page);
+      requestAnimationFrame(scrollToClicked);
+    } else if(raw && window._sprintData){
+      // Just entered outliner mode (from a single-page section). Set up the
+      // observer, render the clicked section immediately so scroll lands true,
+      // and let the observer fill in the rest as the user scrolls.
+      requestAnimationFrame(function(){
+        setupLazyRender(window._sprintData);
+        lazyRenderPage(page, window._sprintData);
+        requestAnimationFrame(scrollToClicked);
+      });
+    }
+  } else if(raw && window._sprintData){
+    requestAnimationFrame(function(){ renderPage(page, window._sprintData); });
+  }
+}
+
+// Scroll-spy for outliner mode using IntersectionObserver — far more accurate
+// than scrollTop math because it doesn't depend on offsetTop staying stable
+// while lazy-loaded sections grow underneath it.
+//
+// rootMargin shifts the "trigger zone" so a section becomes "active" when its
+// top edge crosses ~30% from the top of the viewport (and stays active until
+// it leaves the bottom 60%). This matches the natural reading position.
+var _spyObserver = null;
+var _spyVisible  = {};
+
+function initOutlinerScrollSpy(){
+  if(_spyObserver){ try { _spyObserver.disconnect(); } catch(e){} _spyObserver = null; }
+  _spyVisible = {};
+  var pc = document.getElementById('mc');
+  if(!pc) return;
+  if(!('IntersectionObserver' in window)) return;
+
+  _spyObserver = new IntersectionObserver(function(entries){
+    entries.forEach(function(entry){
+      var id = entry.target.id.replace('page-','');
+      _spyVisible[id] = entry.isIntersecting;
     });
+    updateOutlinerActiveSection();
+  }, {
+    root: pc,
+    // Active band = roughly top 25% to 60% of viewport (35% wide).
+    // Wider than a thin line so short sections (e.g. Goals) don't get skipped
+    // during fast scrolling. We pick the LAST intersecting section so during
+    // transitions the highlight follows what the user is scrolling INTO.
+    rootMargin: '-25% 0px -40% 0px',
+    threshold: 0
+  });
+
+  OUTLINER_PAGES.forEach(function(p){
+    var el = document.getElementById('page-' + p);
+    if(el) _spyObserver.observe(el);
+  });
+}
+
+function updateOutlinerActiveSection(){
+  // Pick the LAST (deepest in DOM) section currently inside the spy band.
+  // During transitions both old + new sections briefly intersect — picking
+  // the last one matches what the user is scrolling INTO, not away from.
+  var active = null;
+  for(var i = OUTLINER_PAGES.length - 1; i >= 0; i--){
+    if(_spyVisible[OUTLINER_PAGES[i]]){ active = OUTLINER_PAGES[i]; break; }
+  }
+  if(!active || active === currentPage) return;
+  currentPage = active;
+  document.querySelectorAll('.sb-item').forEach(function(el){
+    el.classList.toggle('on', el.dataset.page === active);
+  });
+  if(PAGES[active]){
+    document.getElementById('pageTitle').textContent = PAGES[active].title;
+    document.getElementById('pageSub').textContent = PAGES[active].sub;
   }
 }
 
@@ -1098,6 +1293,8 @@ function renderPage(page, d){
 function render(d){
   document.getElementById('mc').innerHTML = shell();
   window._sprintData = d;
+  // Reset rendered-pages tracking — fresh data means everything needs re-render
+  _renderedPages = {};
   // Show Users page only for Admin
   var usersNav = document.getElementById('nav-users');
   if(usersNav){
@@ -1106,15 +1303,34 @@ function render(d){
   }
   // Render subtasks data (used across pages)
   if(typeof doSubtasks === 'function') doSubtasks(d);
-  // Render current page
-  renderPage(currentPage, d);
+  // Bind outliner scroll-spy now that #mc exists
+  initOutlinerScrollSpy();
+  // Activate the right pages based on current mode
+  var pc = document.getElementById('mc');
+  if(isOutlinerPage(currentPage)){
+    pc.classList.add('outliner-mode');
+    document.querySelectorAll('.page').forEach(function(el){
+      var id = el.id.replace('page-','');
+      el.classList.toggle('active', isOutlinerPage(id));
+    });
+    // Render the landing section eagerly (so first paint isn't a placeholder),
+    // then let IntersectionObserver lazy-render the rest as they scroll into view.
+    lazyRenderPage(currentPage, d);
+    setupLazyRender(d);
+  } else {
+    pc.classList.remove('outliner-mode');
+    document.querySelectorAll('.page').forEach(function(el){
+      el.classList.toggle('active', el.id === 'page-' + currentPage);
+    });
+    renderPage(currentPage, d);
+  }
 }
 
 /* ── SHELL HTML — Multi-page layout ── */
 function shell(){
   return ''
   /* OVERVIEW */
-  +'<div class="page active" id="page-overview">'
+  +'<div class="page active" id="page-overview" data-section-label="Overview">'
   +'<div class="krow" id="kr1"></div>'
   +'<div class="krow" id="kr2"></div>'
   +'<div class="sp-card">'
@@ -1128,12 +1344,12 @@ function shell(){
   +'</div>'
 
   /* GOALS */
-  +'<div class="page" id="page-goals">'
+  +'<div class="page" id="page-goals" data-section-label="Sprint Goals">'
   +'<div id="sprintGoalBox"></div>'
   +'</div>'
 
   /* BURNDOWN */
-  +'<div class="page" id="page-burndown">'
+  +'<div class="page" id="page-burndown" data-section-label="Burndown">'
   +'<div class="cc">'
   +'<div class="cc-t">Burndown chart — remaining hours</div>'
   +'<div class="cc-s">Ideal line is based on team capacity (sum of daily hours of active members). Set per-user hours in Users page.</div>'
@@ -1145,7 +1361,7 @@ function shell(){
   +'</div>'
 
   /* TEAM */
-  +'<div class="page" id="page-team">'
+  +'<div class="page" id="page-team" data-section-label="Team">'
   +'<div class="cc"><div class="cc-t">Est. time vs time logged — by team</div>'
   +'<div class="cc-s">Estimated hours vs actual logged hours per team</div>'
   +'<div class="leg"><span class="li"><span class="lsq" style="background:#5b6ef5"></span>Est. time</span>'
@@ -1186,31 +1402,27 @@ function shell(){
   +'<div id="atdSummary" class="atd-summary"></div>'
   +'<div id="atdList" class="member-grid"></div>'
   +'</div>'
+  +'<div class="cc"><div id="subS"></div></div>'
 
   +'</div>'
 
   /* BUGS */
-  +'<div class="page" id="page-bugs">'
+  +'<div class="page" id="page-bugs" data-section-label="Bugs &amp; Polish">'
   +'<div id="bugsS"></div>'
   +'</div>'
 
-  /* SPILLOVERS */
-  +'<div class="page" id="page-spillovers">'
-  +'<div class="g2">'
-  +'<div class="cc"><div class="cc-t">Carried over tasks</div><div class="cc-s">Tasks from previous sprint still active</div><div id="carryS"></div></div>'
-  +'<div class="cc"><div class="cc-t">Backlog section items</div><div class="cc-s">Tasks currently in the Backlog section</div><div id="backlogS"></div></div>'
-  +'</div>'
-  +'<div class="sec">Subtask breakdown</div>'
-  +'<div id="subS"></div>'
+  /* SPILLOVERS — only carry-over (backlog moved out, subtasks moved to Team) */
+  +'<div class="page" id="page-spillovers" data-section-label="Spillovers">'
+  +'<div class="cc"><div id="carryS"></div></div>'
   +'</div>'
 
   /* RETRO */
-  +'<div class="page" id="page-retro">'
+  +'<div class="page" id="page-retro" data-section-label="Retrospective">'
   +'<div id="retroS"></div>'
   +'</div>'
 
   /* PERFORMANCE */
-  +'<div class="page" id="page-performance">'
+  +'<div class="page" id="page-performance" data-section-label="Performance">'
   +'<div class="g2">'
   +'<div class="cc"><div class="cc-t">Top impact performers</div><div class="cc-s">Exceptional ratings (5/5)</div><div id="starsS"></div></div>'
   +'<div class="cc"><div class="cc-t">Top 5 time drainers</div><div class="cc-s">Tasks over estimated budget</div><div id="drainS"></div></div>'
@@ -1218,8 +1430,7 @@ function shell(){
   +'<div class="cc"><div class="cc-t">Performance scorecard</div>'
   +'<div class="cc-s">Composite score · Completion 30% · Estimation 25% · Productivity 15% · Impact 20% · Early bonus 10% · Drainers −15%</div>'
   +'<div id="perfS"></div></div>'
-  +'<div class="sec">Early completions</div>'
-  +'<div id="eS"></div>'
+  +'<div class="cc"><div id="eS"></div></div>'
   +'</div>'
 
   /* USERS */
@@ -1810,19 +2021,39 @@ function doImpact(d){
     +'<div class="imp-card"><div class="imp-val" style="color:'+hc+'">'+d.healthImpact+'%</div><div class="imp-lbl">Sprint health impact</div></div>'
     +'</div>';
   if(d.unplanned.length){
-    html+='<div class="cc"><div class="cc-t">Unplanned tasks — full list</div>'
-      +'<div class="cc-s">'+d.unplanned.length+' tasks added after sprint start</div>'
-      +'<div class="unplanned-list">'+d.unplanned.map(function(t){
-        return '<div class="ul-row"><div class="ul-name">'+trunc(t.name,70)+'</div>'
-          +'<div class="ul-meta"><span class="ul-team">'+t.team+'</span><span class="ul-hrs">'+t.est+' hrs</span></div></div>';
-      }).join('')+'</div></div>';
+    var listInner = d.unplanned.map(function(t){
+      return '<div class="ul-row"><div class="ul-name">'+trunc(t.name,70)+'</div>'
+        +'<div class="ul-meta"><span class="ul-team">'+t.team+'</span><span class="ul-hrs">'+t.est+' hrs</span></div></div>';
+    }).join('');
+    html += '<div class="cc">'
+      + '<div class="bugs-dd-header" onclick="toggleUnplannedList()" id="unpDdHeader">'
+        + '<div class="bugs-dd-title">'
+        + '<span class="bugs-dd-chev">▶</span>'
+        + '<span class="cc-t" style="margin:0">Unplanned tasks — full list</span>'
+        + '<span class="bugs-dd-count">'+d.unplanned.length+'</span>'
+        + '</div>'
+        + '<div class="cc-s" style="margin:0">'+d.unplanned.length+' tasks added after sprint start · '+d.unplannedEst+' hrs</div>'
+      + '</div>'
+      + '<div class="bugs-dd-body" id="unpDdBody" style="display:none">'
+        + '<div class="unplanned-list">'+listInner+'</div>'
+      + '</div>'
+      + '</div>';
   } else {
     html+='<div class="empty">No unplanned tasks in this sprint.</div>';
   }
   el.innerHTML=html;
 }
 
-/* ── SPILLOVERS ── */
+function toggleUnplannedList(){
+  var header = document.getElementById('unpDdHeader');
+  var body   = document.getElementById('unpDdBody');
+  if(!header || !body) return;
+  var isOpen = body.style.display !== 'none';
+  body.style.display = isOpen ? 'none' : 'block';
+  header.classList.toggle('open', !isOpen);
+}
+
+/* ── SPILLOVERS — Carried-over tasks dropdown only ── */
 function doSpillovers(d){
   // Sprint status detection
   var now = new Date();
@@ -1845,52 +2076,62 @@ function doSpillovers(d){
     carryHeaderBadge = '<span class="badge acc" style="margin-left:8px">Live Preview</span>';
   }
 
-  var cHtml = '';
-  if(carried.length){
-    // Count by status
-    var doneCount = carried.filter(function(c){return(c.status||'')==='Done';}).length;
-    var wipCount  = carried.filter(function(c){
-      var s=(c.status||'').trim();
-      return s==='In Progress'||s==='In Review'||s==='Build Awaiting';
-    }).length;
-    var nsCount   = carried.length - doneCount - wipCount;
-
-    cHtml = '<div style="font-size:10px;color:var(--mut);margin-bottom:10px;padding-bottom:8px;border-bottom:1px solid var(--bor)">'
-      + carryStatusText + carryHeaderBadge
-      + '<br><b style="color:var(--text)">'+carried.length+'</b> total \u00b7 '
-      + '<span style="color:var(--grn)">'+doneCount+' done</span> \u00b7 '
-      + '<span style="color:var(--amb)">'+wipCount+' in progress</span> \u00b7 '
-      + '<span style="color:var(--red)">'+nsCount+' not started</span>'
-      + '</div>'
-      + carried.map(function(c){
-        var st=(c.status||'').trim();
-        var badgeCls = st==='Done'?'grn':(st==='In Progress'||st==='In Review'?'acc':'amb');
-        return '<div class="ul-row"><div class="ul-name">'+trunc(c.taskName,55)
-          +'<br><span style="font-size:10px;color:var(--mut)">'+(c.assignee||'Unassigned')+' \u00b7 '+(c.estTime||0)+'h est \u00b7 '+(c.timeLog||0)+'h logged</span></div>'
-          +'<div class="ul-meta"><span class="badge '+badgeCls+'">'+st+'</span></div></div>';
-      }).join('');
-  } else {
-    cHtml = '<div class="empty">No tasks carried over from previous sprint.<br><span style="font-size:10px">'+carryStatusText+'</span></div>';
+  if(!carried.length){
+    document.getElementById('carryS').innerHTML =
+        '<div class="cc-t" style="margin-bottom:4px">Carried over tasks '+carryHeaderBadge+'</div>'
+      + '<div class="cc-s" style="margin-bottom:10px">'+carryStatusText+'</div>'
+      + '<div class="empty">No tasks carried over from previous sprint.</div>';
+    return;
   }
-  document.getElementById('carryS').innerHTML=cHtml;
 
-  // ── Backlog section items ──
-  var dateHint2 = d.startDate && d.endDate ? ' ('+d.startDate+' \u2013 '+d.endDate+')' : '';
-  var bHtml = d.backlog && d.backlog.length
-    ? '<div style="font-size:10px;color:var(--mut);margin-bottom:8px">Backlog items added in this sprint period'+dateHint2+'</div>'
-      + d.backlog.map(function(b){
-        return '<div class="ul-row"><div class="ul-name">'+trunc(b.taskName,55)
-          +'<br><span style="font-size:10px;color:var(--mut)">'+(b.assignee||'Unassigned')+'</span></div>'
-          +'<div class="ul-meta"><span class="badge" style="background:var(--sur2);color:var(--mut)">'+(b.status||'\u2014')+'</span></div></div>';
-      }).join('')
-    : '<div class="empty">No backlog items added in this sprint period.</div>';
-  document.getElementById('backlogS').innerHTML=bHtml;
+  // Count by status
+  var doneCount = carried.filter(function(c){return(c.status||'')==='Done';}).length;
+  var wipCount  = carried.filter(function(c){
+    var s=(c.status||'').trim();
+    return s==='In Progress'||s==='In Review'||s==='Build Awaiting';
+  }).length;
+  var nsCount = carried.length - doneCount - wipCount;
+
+  var summary = '<b style="color:var(--text)">'+carried.length+'</b> total · '
+    + '<span style="color:var(--grn)">'+doneCount+' done</span> · '
+    + '<span style="color:var(--amb)">'+wipCount+' in progress</span> · '
+    + '<span style="color:var(--red)">'+nsCount+' not started</span>';
+
+  var listHtml = carried.map(function(c){
+    var st=(c.status||'').trim();
+    var badgeCls = st==='Done'?'grn':(st==='In Progress'||st==='In Review'?'acc':'amb');
+    return '<div class="ul-row"><div class="ul-name">'+trunc(c.taskName,55)
+      +'<br><span style="font-size:10px;color:var(--mut)">'+(c.assignee||'Unassigned')+' · '+(c.estTime||0)+'h est · '+(c.timeLog||0)+'h logged</span></div>'
+      +'<div class="ul-meta"><span class="badge '+badgeCls+'">'+st+'</span></div></div>';
+  }).join('');
+
+  document.getElementById('carryS').innerHTML =
+      '<div class="bugs-dd-header" onclick="toggleCarryList()" id="carryDdHeader">'
+    + '<div class="bugs-dd-title">'
+    + '<span class="bugs-dd-chev">▶</span>'
+    + '<span class="cc-t" style="margin:0">Carried over tasks</span>'
+    + '<span class="bugs-dd-count">'+carried.length+'</span>'
+    + carryHeaderBadge
+    + '</div>'
+    + '<div class="cc-s" style="margin:0">'+carryStatusText+' · '+summary+'</div>'
+    + '</div>'
+    + '<div class="bugs-dd-body" id="carryDdBody" style="display:none">'+listHtml+'</div>';
+}
+
+function toggleCarryList(){
+  var header = document.getElementById('carryDdHeader');
+  var body   = document.getElementById('carryDdBody');
+  if(!header || !body) return;
+  var isOpen = body.style.display !== 'none';
+  body.style.display = isOpen ? 'none' : 'block';
+  header.classList.toggle('open', !isOpen);
 }
 
 /* ── SUBTASKS ── */
 var subFilter='all';
 function doSubtasks(d){
   var el=document.getElementById('subS');
+  if(!el) return;
   var groups=d.subtaskGroups||{};
   var keys=Object.keys(groups);
   if(!keys.length){
@@ -1934,8 +2175,20 @@ function doSubtasks(d){
     return true;
   });
 
-  // Table
-  var html=filters+'<div style="max-height:600px;overflow-y:auto;border:1px solid var(--bor);border-radius:10px">'
+  // Wrap entire subtask section in a collapsible dropdown (like Bugs list)
+  var summaryTxt = totalParents+' parent task'+(totalParents===1?'':'s')+' · '+totalDone+'/'+totalSubs+' subtasks done ('+overallPct+'%)';
+  var html = '<div class="bugs-dd-header" onclick="toggleSubtaskList()" id="subDdHeader">'
+    + '<div class="bugs-dd-title">'
+    + '<span class="bugs-dd-chev">▶</span>'
+    + '<span class="cc-t" style="margin:0">Subtask breakdown</span>'
+    + '<span class="bugs-dd-count">'+totalSubs+'</span>'
+    + '</div>'
+    + '<div class="cc-s" style="margin:0">'+summaryTxt+'</div>'
+    + '</div>'
+    + '<div class="bugs-dd-body" id="subDdBody" style="display:none">';
+
+  // Inner content: filter buttons + scrollable table
+  html += filters+'<div style="max-height:600px;overflow-y:auto;border:1px solid var(--bor);border-radius:10px">'
     +'<table class="sub-table"><thead><tr><th>Task</th><th>Status</th><th>Progress</th><th>Est.</th><th>Logged</th></tr></thead><tbody>';
 
   filteredKeys.forEach(function(parent,pi){
@@ -1970,8 +2223,17 @@ function doSubtasks(d){
     });
   });
 
-  html+='</tbody></table></div>';
+  html+='</tbody></table></div></div>'; // close table-wrap + bugs-dd-body
   el.innerHTML=html;
+}
+
+function toggleSubtaskList(){
+  var header = document.getElementById('subDdHeader');
+  var body   = document.getElementById('subDdBody');
+  if(!header || !body) return;
+  var isOpen = body.style.display !== 'none';
+  body.style.display = isOpen ? 'none' : 'block';
+  header.classList.toggle('open', !isOpen);
 }
 
 function toggleSubRows(pid){
@@ -2386,8 +2648,13 @@ function doPerformance(d){
 /* ── EARLY COMPLETIONS ── */
 function doEarly(d){
   var el=document.getElementById('eS');
+  if(!el) return;
   if(!d.early||!d.early.length){el.innerHTML='<div class="empty">No early completions in this sprint.</div>';return;}
-  el.innerHTML='<div class="early-grid">'+d.early.map(function(e){
+
+  var totalSaved = d.early.reduce(function(s,e){ return s + (parseFloat(e.saved)||0); }, 0);
+  var summary = d.early.length+' task'+(d.early.length===1?'':'s')+' done early · '+rnd(totalSaved)+' hrs saved';
+
+  var grid = '<div class="early-grid">'+d.early.map(function(e){
     var pct=Math.round(e.saved/e.est*100);
     return '<div class="ec"><div class="ec-badge">'+pct+'% faster</div>'
       +'<div class="ec-name">'+e.asn+'</div>'
@@ -2398,6 +2665,25 @@ function doEarly(d){
       +'<div class="ec-st"><label>Saved</label><span style="color:var(--grn)">'+e.saved+' hrs</span></div>'
       +'</div></div>';
   }).join('')+'</div>';
+
+  el.innerHTML = '<div class="bugs-dd-header" onclick="toggleEarlyList()" id="earlyDdHeader">'
+    + '<div class="bugs-dd-title">'
+    + '<span class="bugs-dd-chev">▶</span>'
+    + '<span class="cc-t" style="margin:0">Early completions</span>'
+    + '<span class="bugs-dd-count">'+d.early.length+'</span>'
+    + '</div>'
+    + '<div class="cc-s" style="margin:0">'+summary+'</div>'
+    + '</div>'
+    + '<div class="bugs-dd-body" id="earlyDdBody" style="display:none">'+grid+'</div>';
+}
+
+function toggleEarlyList(){
+  var header = document.getElementById('earlyDdHeader');
+  var body   = document.getElementById('earlyDdBody');
+  if(!header || !body) return;
+  var isOpen = body.style.display !== 'none';
+  body.style.display = isOpen ? 'none' : 'block';
+  header.classList.toggle('open', !isOpen);
 }
 
 // ── ASSIGNEE TASK DETAIL ──
