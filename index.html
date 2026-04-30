@@ -549,7 +549,7 @@ select{background:var(--sur);color:var(--text);border:0.5px solid var(--bor);bor
 .mm-meta .pill{display:inline-block;padding:3px 8px;border-radius:5px;font-size:9px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:#fff}
 .mm-close{background:transparent;border:1px solid var(--bor);color:var(--mut);width:34px;height:34px;border-radius:8px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;transition:all .15s}
 .mm-close:hover{border-color:var(--red);color:var(--red)}
-.mm-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;padding:16px 22px 8px}
+.mm-stats{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;padding:16px 22px 8px}
 .mm-stat{background:var(--sur2);border:0.5px solid var(--bor);border-radius:8px;padding:12px 8px;text-align:center}
 .mm-stat-v{font-family:var(--font-mono);font-size:20px;font-weight:600;color:var(--text);letter-spacing:-.02em;line-height:1}
 .mm-stat-l{font-size:9px;color:var(--mut);text-transform:uppercase;letter-spacing:.5px;margin-top:6px;font-weight:600}
@@ -2818,6 +2818,24 @@ function buildMemberBuckets(d){
     if(!ownsParent) b.orphanSubs.push(s);
   });
 
+  // ── Merge sprint-period bugs into per-member time totals ──
+  // Same logic as process(): bug fix hours count toward the assignee's
+  // logged/estimated time so roster cards + modal stats stay consistent
+  // with the team/individual charts. Bugs are deliberately NOT added to
+  // the task list, task counts, or done/prog/ns — they're tracked
+  // separately on the Bugs page.
+  var bugs = (d && d.bugs) || [];
+  bugs.forEach(function(b){
+    var est = parseFloat(b.estTime)||0;
+    var log = parseFloat(b.timeLog)||0;
+    if(!est && !log) return;
+    var asn = (b.assignee||'').trim() || 'Unassigned';
+    var bk = bucket(asn, b.teamCategory);
+    bk.totEst += est;
+    bk.totLog += log;
+    // intentionally NOT touching .tasks / .ownedSubs / .total / .done / .prog / .ns
+  });
+
   return byAsn;
 }
 
@@ -2944,6 +2962,7 @@ function renderMemberDetail(a, d){
     + '<div class="mm-stat"><div class="mm-stat-v">'+totalItems+'</div><div class="mm-stat-l">Total items</div></div>'
     + '<div class="mm-stat"><div class="mm-stat-v" style="color:var(--grn)">'+a.done+'</div><div class="mm-stat-l">Completed</div></div>'
     + '<div class="mm-stat"><div class="mm-stat-v">'+rnd(a.totEst)+'<span style="font-size:11px;color:var(--mut)">h</span></div><div class="mm-stat-l">Estimated</div></div>'
+    + '<div class="mm-stat"><div class="mm-stat-v" style="color:var(--grn)">'+rnd(a.totLog)+'<span style="font-size:11px;color:var(--mut)">h</span></div><div class="mm-stat-l">Logged</div></div>'
     + '<div class="mm-stat"><div class="mm-stat-v" style="color:'+varCol+'">'+(totalVar>0?'+':'')+totalVar+'<span style="font-size:11px">h</span></div><div class="mm-stat-l">Variance</div></div>';
 
   document.getElementById('mmProgressFill').style.width = pct + '%';
