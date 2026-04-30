@@ -777,7 +777,7 @@ select{background:var(--sur);color:var(--text);border:0.5px solid var(--bor);bor
 <!-- end of #root -->
 
 <script>
-var API='https://script.google.com/macros/s/AKfycbzYb0Az2MxVyMyno0VjU31CTIJRlrz8SsN-g4Q0smH1W6_0bL46IdwE-Ix-CNXxiVoEQQ/exec';
+var API='https://script.google.com/macros/s/AKfycbyWPiU96RAr0R65SfGh1VYs6tHU_gycqZy3k2JXMSB2FgheT4lLk8wmXctbSWyi-YcJlg/exec';
 var CH={},isDark=true,raw=null,cur=null,curTeam='All',curIndvTeam='All';
 var TC=['#5b6ef5','#18c97a','#9b72f5','#f5a623','#f05252','#22c4c4','#0aaa62'];
 var TEAM_COLORS={};
@@ -928,6 +928,43 @@ function process(json,spId){
     if(!amap[asn])amap[asn]={n:asn,team:team,tot:0,done:0,est:0,log:0,times:[]};
     amap[asn].tot++; amap[asn].est+=est; amap[asn].log+=log;
     if(isDone){amap[asn].done++;if(log>0)amap[asn].times.push(log);}
+  });
+
+  // ── Merge sprint-period bugs into time/effort metrics ──
+  //
+  // Bugs created within the sprint date range count as REAL WORK done in
+  // this sprint. We add their est+log to the sprint totals and assignee/team
+  // breakdowns, so individual hours, team effort, burndown, and totals
+  // reflect time actually spent.
+  //
+  // Deliberately NOT added to:
+  //   • allItems / done / prog / ns / ovd  — bug counts stay separate from
+  //     task counts (sprint completion % shouldn't depend on bugs)
+  //   • unplanned[] / scope creep         — only Feature Tag = "Unplanned"
+  //     marks scope creep, never bugs
+  //   • drainers / stars / early          — those are task-level metrics
+  bugs.forEach(function(b){
+    var est = parseFloat(b.estTime) || 0;
+    var log = parseFloat(b.timeLog) || 0;
+    if(!est && !log) return; // no work logged, skip silently
+
+    totEst += est;
+    totLog += log;
+
+    var team = (b.teamCategory || '').toString();
+    if(team){
+      tc(team);
+      if(!tmap[team]) tmap[team] = {n:team, done:0, prog:0, ns:0, ovd:0, est:0, log:0, tot:0};
+      tmap[team].est += est;
+      tmap[team].log += log;
+      // intentionally NOT incrementing tmap[team].tot — bug count stays separate
+    }
+
+    var asn = b.assignee || 'Unassigned';
+    if(!amap[asn]) amap[asn] = {n:asn, team:team, tot:0, done:0, est:0, log:0, times:[]};
+    amap[asn].est += est;
+    amap[asn].log += log;
+    // intentionally NOT incrementing amap[asn].tot or amap[asn].done
   });
 
   drainers.sort(function(a,b){return b.var-a.var;});
