@@ -207,6 +207,9 @@ select{background:var(--sur);color:var(--text);border:0.5px solid var(--bor);bor
 .loading{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:60vh;gap:16px}
 .spin{width:36px;height:36px;border:2px solid var(--bor);border-top-color:var(--acc);border-radius:50%;animation:spin .7s linear infinite}
 @keyframes spin{to{transform:rotate(360deg)}}
+/* Inline spinner for the Sync Now button — animates the inline SVG icon */
+.icn.spinning{animation:spin .85s linear infinite;transform-origin:center}
+#syncNowBtn:disabled{opacity:.85;cursor:wait}
 .loading p{font-size:12px;color:var(--mut)}
 .err{background:rgba(240,82,82,.07);border:0.5px solid rgba(240,82,82,.3);border-radius:10px;padding:24px;text-align:center;color:var(--red);font-size:12px;line-height:1.8}
 /* sync bar */
@@ -743,7 +746,8 @@ select{background:var(--sur);color:var(--text);border:0.5px solid var(--bor);bor
           </div>
         </div>
         <select id="spSel" class="sprint-select"></select>
-        <button class="btn btn-acc" id="syncBtn"><svg class="icn" viewBox="0 0 24 24"><path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"/><path d="M16 16h5v5"/></svg>Refresh</button>
+        <button class="btn" id="syncBtn" title="Reload dashboard from sheet"><svg class="icn" viewBox="0 0 24 24"><path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"/><path d="M16 16h5v5"/></svg>Refresh</button>
+        <button class="btn btn-acc" id="syncNowBtn" title="Pull latest data from Asana right now (skips cron schedule)"><svg class="icn" viewBox="0 0 24 24"><path d="M5 12h14"/><path d="M12 5l7 7-7 7"/></svg>Sync Now</button>
         <button class="btn pdf-btn" id="pdfBtn"><svg class="icn" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" x2="8" y1="13" y2="13"/><line x1="16" x2="8" y1="17" y2="17"/><line x1="10" x2="8" y1="9" y2="9"/></svg>PDF</button>
       </div>
       <div class="scroll-progress" aria-hidden="true"><div class="scroll-progress-fill" id="scrollProgressFill"></div></div>
@@ -1443,7 +1447,7 @@ function renderPage(page, d){
   } else if(page === 'burndown'){
     doBurn(d);
   } else if(page === 'team'){
-    doArea(d); doIndividual(d, curIndvTeam || 'All'); doScopeEffort(d); doImpact(d); doTabs(d); doCombo(d, curTeam || 'All');
+    doArea(d); doIndividual(d, curIndvTeam || 'All'); doScopeEffort(d); doImpact(d);
     doAssigneeTaskDetail(d);
   } else if(page === 'bugs'){
     doBugsBacklog(d);
@@ -1555,15 +1559,6 @@ function shell(){
   +'<div class="ef-wrap"><div style="position:relative;width:110px;height:110px;flex-shrink:0"><canvas id="dC"></canvas></div>'
   +'<div class="ef-leg" id="eL"></div></div></div></div>'
   +'<div id="impactS"></div>'
-  +'<div class="sec">Assignee overview</div>'
-  +'<div class="tabs" id="tRow"></div>'
-  +'<div class="cc"><div class="cc-t" id="cT">All members</div>'
-  +'<div class="cc-s">Est. and logged time (bars) · Task count (line)</div>'
-  +'<div class="leg"><span class="li"><span class="lsq" style="background:#9b72f5"></span>Est. time</span>'
-  +'<span class="li"><span class="lsq" style="background:#18c97a"></span>Time logged</span>'
-  +'<span class="li"><span class="lsq" style="background:#f5a623;border-radius:50%"></span>Total tasks</span>'
-  +'<span class="li"><span class="lsq" style="background:#18c97a;border-radius:50%;border:2px dashed #18c97a;background:transparent"></span>Done tasks</span></div>'
-  +'<div style="position:relative;height:260px"><canvas id="cC"></canvas></div></div>'
 
   +'<div class="sec" style="margin-top:22px">Assignee task detail</div>'
   +'<div class="cc"><div class="cc-t">Roster</div>'
@@ -2041,10 +2036,21 @@ function doIndividual(d,tf){
     if(idx<0){tip.style.opacity='0';return;}
     var a=asns[idx];var diff=rnd(a.log-a.est);
     var statusLine=diff>0?'<span style="color:#f05252">⚠ Overtime: +'+diff+' hrs</span>':(diff<0?'<span style="color:#18c97a">✓ Saved: '+Math.abs(diff)+' hrs</span>':'<span style="color:#9b72f5">• On target</span>');
+    // Task counts merged in from the old "Assignee overview" chart so this
+    // single tooltip now answers est/log AND throughput in one glance.
+    var doneN = a.done || 0;
+    var totN  = a.tot  || 0;
+    var pct   = totN > 0 ? Math.round(doneN/totN*100) : 0;
+    var pctCol = pct >= 80 ? '#18c97a' : pct >= 50 ? '#f5a623' : '#f05252';
     tip.innerHTML='<div style="font-weight:700;margin-bottom:6px;color:#fff">'+a.n+'</div>'
       +'<div style="margin-bottom:3px"><span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:rgba(155,114,245,.75);margin-right:6px"></span>Est: '+a.est+' hrs</div>'
       +'<div style="margin-bottom:5px"><span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:'+(a.log>a.est?'#f05252':'#18c97a')+';margin-right:6px"></span>Logged: '+a.log+' hrs</div>'
-      +'<div style="border-top:1px solid rgba(255,255,255,.1);padding-top:5px;margin-top:2px">'+statusLine+'</div>';
+      +'<div style="border-top:1px solid rgba(255,255,255,.1);padding-top:5px;margin-top:2px;margin-bottom:4px">'+statusLine+'</div>'
+      +'<div style="display:flex;justify-content:space-between;gap:14px;font-size:11px;color:#a0a8c0">'
+        +'<span><span style="color:#f5a623">●</span> Total: <b style="color:#fff">'+totN+'</b></span>'
+        +'<span><span style="color:#18c97a">●</span> Done: <b style="color:#fff">'+doneN+'</b></span>'
+        +'<span style="color:'+pctCol+';font-weight:700">'+pct+'%</span>'
+      +'</div>';
     tip.style.opacity='1';
     tip.style.left=(evt.clientX+15)+'px';
     tip.style.top=(evt.clientY-40)+'px';
@@ -2692,48 +2698,8 @@ function deleteRetroItem(kind, idx){
   renderRetro();
 }
 
-/* ── ASSIGNEE COMBO CHART — 4 datasets ── */
-function doCombo(d,tf){
-  var asns=d.assignees.filter(function(a){return(tf==='All'||a.team===tf)&&a.n!=='Unassigned';});
-  document.getElementById('cT').textContent=tf==='All'?'All team members':tf+' team';
-  var names=asns.map(function(a){return a.n;});
-  var c=cc();
-  if(CH.c)CH.c.destroy();
-  CH.c=new Chart(document.getElementById('cC'),{data:{labels:names,datasets:[
-    {type:'bar',  label:'Est. time',   data:asns.map(function(a){return a.est;}),  backgroundColor:'rgba(155,114,245,.7)',borderRadius:4,yAxisID:'y',order:3},
-    {type:'bar',  label:'Time logged', data:asns.map(function(a){return a.log;}),  backgroundColor:'rgba(24,201,122,.7)', borderRadius:4,yAxisID:'y',order:3},
-    {type:'line', label:'Total tasks', data:asns.map(function(a){return a.tot;}),  borderColor:'#f5a623',backgroundColor:'rgba(245,166,35,.06)',fill:false,borderWidth:2,pointRadius:4,pointBackgroundColor:'#f5a623',tension:.25,yAxisID:'y2',order:2},
-    {type:'line', label:'Done tasks',  data:asns.map(function(a){return a.done||0;}),borderColor:'#18c97a',backgroundColor:'rgba(24,201,122,.08)',fill:false,borderWidth:2,borderDash:[4,3],pointRadius:4,pointBackgroundColor:'#18c97a',tension:.25,yAxisID:'y2',order:1}
-  ]},options:{responsive:true,maintainAspectRatio:false,
-    plugins:{legend:{display:false},tooltip:{mode:'index',intersect:false,callbacks:{
-      afterBody: function(items){
-        var a = asns[items[0].dataIndex];
-        var pct = a.tot > 0 ? Math.round((a.done||0)/a.tot*100) : 0;
-        return 'Completion: ' + pct + '%';
-      }
-    }}},
-    scales:{
-      x:{grid:{color:c.grid},ticks:{color:c.text,font:{size:10},maxRotation:35,minRotation:35,autoSkip:false}},
-      y:{grid:{color:c.grid},ticks:{color:c.text,font:{size:10}},title:{display:true,text:'Hours',color:c.text,font:{size:10}}},
-      y2:{position:'right',grid:{display:false},ticks:{color:'#f5a623',font:{size:10},stepSize:1},title:{display:true,text:'Tasks',color:'#f5a623',font:{size:10}},beginAtZero:true}
-    }}});
-}
-
-/* ── TEAM TABS ── */
-function doTabs(d){
-  var list=['All'].concat(d.teams.map(function(t){return t.n;}));
-  document.getElementById('tRow').innerHTML=list.map(function(t){
-    return '<div class="tab'+(t===curTeam?' on':'')+'" data-t="'+t+'">'+t+'</div>';
-  }).join('');
-  document.querySelectorAll('.tab').forEach(function(el){
-    el.addEventListener('click',function(){
-      curTeam=this.dataset.t;
-      document.querySelectorAll('.tab').forEach(function(x){x.classList.remove('on');});
-      this.classList.add('on');
-      doCombo(d,curTeam);
-    });
-  });
-}
+/* doCombo + doTabs removed — duplicated metrics that now surface inside
+   doIndividual's tooltip + completion badge on each row. */
 
 /* ── STARS + DRAINERS ── */
 function doDrainersStars(d){
@@ -3083,6 +3049,14 @@ function renderATDList(d){
 // ── MEMBER DETAIL MODAL ──
 var _mmStatusFilter = 'All';
 
+// Defensive name normalizer — Asana sometimes returns names with trailing
+// whitespace, double spaces, or inconsistent case. We use this everywhere
+// we compare an assignee field against the modal's owner to avoid silently
+// surfacing someone else's work on the wrong card.
+function mmNormName(s){
+  return String(s || '').replace(/\s+/g, ' ').trim().toLowerCase();
+}
+
 function openMemberDetail(name){
   var d = window._sprintData;
   if(!d){ console.warn('[MEMBER] no data'); return; }
@@ -3155,13 +3129,18 @@ function renderMemberDetail(a, d){
   var html = '';
 
   // ── Section 1: Parent tasks owned ──
-  // Include parent if EITHER the parent's own status matches OR any of its
-  // subtasks match. Otherwise nested subtasks under a non-matching parent
-  // would silently disappear from the filtered view.
+  // A subtask only belongs in a member's list when they are the assignee on
+  // it — even if the parent task is theirs. So when deciding whether to keep
+  // a parent, we look at the owner's OWN subs of that parent (not all subs).
+  // Parent is kept if its own status matches OR any of the owner's subs
+  // under it match.
+  var ownerName = a.name;
+  var ownerKey  = mmNormName(ownerName);
   var ownedParents = a.tasks.filter(function(t){
     if(matchesFilter(t.status)) return true;
-    var subs = subtaskGroups[(t.taskName||'').trim()] || [];
-    return subs.some(function(s){ return matchesFilter(s.status); });
+    var subs = subtaskGroups[t.taskName] || subtaskGroups[(t.taskName||'').trim()] || [];
+    var ownSubs = subs.filter(function(s){ return mmNormName(s.assignee) === ownerKey; });
+    return ownSubs.some(function(s){ return matchesFilter(s.status); });
   });
   if(a.tasks.length){
     html += '<div class="mm-section">'
@@ -3211,9 +3190,19 @@ function renderMmTask(t, subtaskGroups, ownerName, matchesFilter){
   var v   = rnd(log - est);
   var st  = (t.status||'').trim() || 'Not Started';
   var isDone = st === 'Done';
-  var subs = subtaskGroups[t.taskName] || [];
-  // When a status filter is active, only render the matching subtasks under
-  // this parent — keeps the count/items in sync with the active filter pill.
+  // Look up subs by both raw + trimmed key — Asana sync sometimes leaves
+  // trailing whitespace on parent task names, which would otherwise miss.
+  var subs = subtaskGroups[t.taskName] || subtaskGroups[(t.taskName||'').trim()] || [];
+  // Only render subs assigned to the modal's owner — work belongs to the
+  // person on the assignee field, not to whoever happens to own the parent.
+  // Subs assigned to others appear in their own member's modal instead.
+  // Compare with a defensive normalize (collapse whitespace + lowercase) so
+  // a stray space or capitalization difference can't accidentally surface
+  // someone else's work on this card.
+  var ownerKey = mmNormName(ownerName);
+  subs = subs.filter(function(s){ return mmNormName(s.assignee) === ownerKey; });
+  // When a status filter is active, narrow further to just matching subs so
+  // the visible items match the active filter pill count.
   if(typeof matchesFilter === 'function'){
     subs = subs.filter(function(s){ return matchesFilter(s.status); });
   }
@@ -3248,7 +3237,7 @@ function renderMmSub(s, ownerName){
   var sSt  = (s.status||'').trim() || 'Not Started';
   var done = sSt === 'Done';
   var dotCol = done ? 'var(--grn)' : (sSt==='In Progress' ? 'var(--acc)' : (sSt==='Re-opened' ? 'var(--red)' : 'var(--mut)'));
-  var ownTag = (s.assignee||'') === ownerName ? '' : '<span class="mm-sub-owner">→ '+(s.assignee||'?')+'</span>';
+  var ownTag = mmNormName(s.assignee) === mmNormName(ownerName) ? '' : '<span class="mm-sub-owner">→ '+(s.assignee||'?')+'</span>';
   return '<div class="mm-sub">'
     + '<span class="mm-sub-dot" style="background:'+dotCol+'"></span>'
     + '<div class="mm-sub-mid">'
@@ -3621,6 +3610,40 @@ document.getElementById('spSel').addEventListener('change',function(){
 });
 document.getElementById('syncBtn').addEventListener('click',init);
 // Theme toggle now handled via Settings page
+
+// ── Sync Now button ──
+// Triggers Apps Script's `manualSync` (Asana → Sheet pull), then refreshes
+// the dashboard. Useful at standup time when the cron schedule hasn't fired
+// yet but a fresh number is needed. Throttled so a double-click can't fire
+// two syncs at once (each one hits Asana API).
+async function triggerManualSync(){
+  var btn = document.getElementById('syncNowBtn');
+  if(!btn || btn.disabled) return;
+  var origHTML = btn.innerHTML;
+  btn.disabled = true;
+  btn.innerHTML = '<svg class="icn spinning" viewBox="0 0 24 24"><path d="M21 12a9 9 0 1 1-3.84-7.39"/></svg>Syncing…';
+  try{
+    var url = API + '?action=manualSync&email=' + encodeURIComponent(window._userEmail||'') + '&_cb=' + Date.now();
+    var res = await fetch(url, { method:'GET', redirect:'follow' });
+    var txt = await res.text();
+    var json;
+    try { json = JSON.parse(txt.trim()); }
+    catch(e){ throw new Error('Invalid response from server'); }
+    if(json.error) throw new Error(json.message || json.error);
+    if(!json.ok)   throw new Error('Sync did not complete');
+    // Sync succeeded — pull fresh data into the dashboard
+    btn.innerHTML = '<svg class="icn" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>Synced';
+    await new Promise(function(r){ setTimeout(r, 600); });
+    init(); // re-fetches the sheet
+  } catch(err){
+    btn.innerHTML = '<svg class="icn" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" x2="12" y1="8" y2="12"/><line x1="12" x2="12.01" y1="16" y2="16"/></svg>Failed';
+    console.error('[manualSync]', err);
+    alert('Sync failed: ' + err.message);
+  } finally {
+    setTimeout(function(){ btn.innerHTML = origHTML; btn.disabled = false; }, 1500);
+  }
+}
+document.getElementById('syncNowBtn').addEventListener('click', triggerManualSync);
 
 // ── AUTH FLOW ──
 function showLoginScreen(){
