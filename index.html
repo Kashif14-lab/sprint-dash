@@ -709,6 +709,12 @@ select{background:var(--sur);color:var(--text);border:0.5px solid var(--bor);bor
 .nv-card{background:var(--sur);border:1px solid var(--bor);border-radius:12px;position:relative}
 .nv-ov-card{height:260px;padding:0;overflow:hidden}
 .nv-hd{position:absolute;top:16px;left:17px;right:17px;display:flex;align-items:center;justify-content:space-between;gap:8px;z-index:2}
+/* Bugs & polish filter — single toggle button, sits under the card title */
+.nv-hd{align-items:flex-start}
+.nv-hd-l{display:flex;flex-direction:column;align-items:flex-start;gap:7px;min-width:0}
+.nv-bp-tog{appearance:none;font-family:var(--font-body);font-size:11.5px;font-weight:600;letter-spacing:.01em;color:#8f9dff;background:rgba(91,110,245,.13);border:1px solid rgba(91,110,245,.45);padding:5px 12px;border-radius:7px;cursor:pointer;white-space:nowrap;display:inline-flex;align-items:center;gap:6px;transition:background .15s,border-color .15s}
+.nv-bp-tog::before{content:'';width:6px;height:6px;border-radius:50%;background:#5b6ef5}
+.nv-bp-tog:hover{background:rgba(91,110,245,.2);border-color:rgba(91,110,245,.65)}
 .nv-card-t{font-family:var(--font-display);font-weight:700;font-size:13px;color:var(--text);letter-spacing:-.01em}
 .nv-pill{font-family:var(--font-body);font-weight:600;font-size:11px;padding:5px 10px;border-radius:20px;display:inline-flex;align-items:center;white-space:nowrap}
 .nv-pill.good{background:rgba(24,201,122,.15);border:1px solid rgba(24,201,122,.3);color:var(--grn)}
@@ -1356,6 +1362,9 @@ function process(json,spId){
   //   • drainers / stars / early — those are sprint task-level metrics
   var bugsAndPolish = bugs.concat(polish);
   var bugPolishCount = bugsAndPolish.length;
+  // Snapshot the task-only figures BEFORE bugs/polish are folded in, so the
+  // Overview cards can be shown with or without them (see d.exBP below).
+  var _preBP = { totEst:totEst, totLog:totLog, done:done, prog:prog, ns:ns, ovd:ovd };
   bugsAndPolish.forEach(function(b){
     var est = parseFloat(b.estTime) || 0;
     var log = parseFloat(b.timeLog) || 0;
@@ -1608,7 +1617,19 @@ leaveRecords.forEach(function(leave){
   // Total items now includes bugs + polish — they count as real work in the
   // sprint, so completion rate and scope creep should weigh them too.
   var grandTotal = allItems.length + bugPolishCount;
+  // Task-only mirror of the Overview metrics (bugs + polish excluded).
+  // Unplanned figures are already bug-free, so they're shared, not duplicated.
+  var exBP = {
+    total:   allItems.length,
+    done:    _preBP.done, prog: _preBP.prog, ns: _preBP.ns, ovd: _preBP.ovd,
+    totEst:  rnd(_preBP.totEst),
+    totLog:  rnd(_preBP.totLog),
+    compRate: pc(_preBP.done, allItems.length),
+    util:     pc(_preBP.totLog, _preBP.totEst)
+  };
   return{
+    exBP,
+    bugPolishCount,
     sprints,spInfo,tasks,subtasks,goals,bugs,polish,backlog,carried,
     total:grandTotal,done,prog,ns,ovd,
     totEst:rnd(totEst),totLog:rnd(totLog),
@@ -1625,6 +1646,7 @@ leaveRecords.forEach(function(leave){
     areaLog:Object.values(tmap).map(function(t){return Math.round(t.log);}),
     bI,bA,bL,early,unplanned,drainers,stars,
     unplannedCount:unplanned.length,
+    unplannedLog: rnd(unplanned.reduce(function(s,t){ return s+(parseFloat(t.log)||0); },0)),
     unplannedEst:rnd(unplannedEst),
     plannedEst,healthImpact,
     leaveRecords:leaveRecords,
@@ -1977,7 +1999,12 @@ function shell(){
   /* ── Top row: completion donut · status grid · bugs donut · scope donut · missing hours ── */
   +'<div class="nv-ov-top">'
   +  '<div class="nv-card nv-ov-card">'
-  +    '<div class="nv-hd"><span class="nv-card-t">Completion Rate</span><span class="nv-pill" id="ovCompPill"></span></div>'
+  +    '<div class="nv-hd">'
+  +      '<span class="nv-hd-l">'
+  +        '<span class="nv-card-t">Completion Rate</span>'
+  +        '<button type="button" class="nv-bp-tog" id="ovBpTog" onclick="nvSetBP()"></button>'
+  +      '</span>'
+  +      '<span class="nv-pill" id="ovCompPill"></span></div>'
   +    '<div class="nv-donut"><canvas id="crD"></canvas><div class="nv-donut-c" id="crDc"></div></div>'
   +    '<div class="nv-chips" id="ovCompChips"></div>'
   +  '</div>'
@@ -2160,26 +2187,66 @@ function nvStatusPill(el, rate){
   var s = rate>=85?['good','On Track']:(rate>=60?['warn','At Risk']:['bad','Off Track']);
   el.className='nv-pill '+s[0]; el.textContent=s[1];
 }
+/* Bugs & polish filter for the Overview cards.
+   'with'    → Completion Rate + Status include bugs and polishes (default)
+   'without' → task-only figures, bugs and polishes excluded
+   Only these two cards change; the Bugs & Polishes card is unaffected. */
+window._bpMode = window._bpMode || 'with';
+/* Single toggle button. Called with no argument it flips the mode; the label
+   always shows what is CURRENTLY being counted. */
+function nvSetBP(mode){
+  if(mode === 'with' || mode === 'without') window._bpMode = mode;
+  else window._bpMode = (window._bpMode === 'without') ? 'with' : 'without';
+  nvPaintBP();
+  if(window._sprintData) doOverview(window._sprintData);
+}
+/* Paints the button to match the active mode. Also called after each render,
+   since shell() rebuilds the button empty. */
+function nvPaintBP(){
+  var tog = document.getElementById('ovBpTog');
+  if(!tog) return;
+  var withBP = (window._bpMode !== 'without');
+  tog.textContent = withBP ? 'Incl. bugs & polish' : 'Tasks only';
+  tog.title = withBP
+    ? 'Counting sprint tasks plus bugs & polishes — click for tasks only'
+    : 'Counting sprint tasks only — click to include bugs & polishes';
+}
+
 function doOverview(d){
   var COL={blue:'#4d9fff',green:'#18c97a',amber:'#f5a623',red:'#f05252',bug:'#ff4d6d',polish:'#5b6ef5'};
 
+  nvPaintBP();   // shell() rebuilds the button empty — restore its label/state
+
+  // Bugs & polish filter — affects the Completion Rate + Status cards only.
+  // 'with' uses the merged totals; 'without' uses the task-only mirror (d.exBP).
+  var m = (window._bpMode === 'without' && d.exBP) ? d.exBP : d;
+
   // Completion donut (clickable: segment -> task list)
-  nvDonut('crD',[d.done,d.prog,d.ns,d.ovd],[COL.green,COL.blue,COL.amber,COL.red],
+  nvDonut('crD',[m.done,m.prog,m.ns,m.ovd],[COL.green,COL.blue,COL.amber,COL.red],
     function(i){ nvStatusDetail(['done','wip','ns','ovd'][i]); });
-  var crc=document.getElementById('crDc'); if(crc) crc.textContent=d.compRate+'%';
+  var crc=document.getElementById('crDc'); if(crc) crc.textContent=m.compRate+'%';
   var cChips=document.getElementById('ovCompChips');
   if(cChips) cChips.innerHTML=nvChips([
-    {c:COL.green,n:d.done,l:'Completed'},{c:COL.blue,n:d.prog,l:'In Progress'},
-    {c:COL.amber,n:d.ns,l:'Not Started'},{c:COL.red,n:d.ovd,l:'Overdue'}]);
-  nvStatusPill(document.getElementById('ovCompPill'), d.compRate);
+    {c:COL.green,n:m.done,l:'Completed'},{c:COL.blue,n:m.prog,l:'In Progress'},
+    {c:COL.amber,n:m.ns,l:'Not Started'},{c:COL.red,n:m.ovd,l:'Overdue'}]);
+  nvStatusPill(document.getElementById('ovCompPill'), m.compRate);
 
   // Status grid
   var rem=Math.max(0,(d.dTot||0)-(d.dDone||0));
+  // "Original Est." = the workload actually PLANNED at sprint start. Unplanned
+  // work is reported separately in "Extra Hours", so it's subtracted here
+  // instead of being buried inside the estimate. Total Logged and Efficiency
+  // drop unplanned hours too, so all three describe the same body of work.
+  var uEst    = d.unplannedEst || 0;
+  var uLog    = d.unplannedLog || 0;
+  var plEstV  = Math.max(0, rnd(m.totEst - uEst));
+  var plLogV  = Math.max(0, rnd(m.totLog - uLog));
+  var plUtil  = plEstV > 0 ? Math.round(plLogV / plEstV * 100) : 0;
   var sg=[
-    {l:'Original Est.',v:fmtHours(d.totEst),c:'blue', s:'Planned workload'},
-    {l:'Total Logged', v:fmtHours(d.totLog),c:'green',s:'Actual work done'},
-    {l:'Efficiency',   v:d.util+'%',          c:'amber',s:'Log vs estimate'},
-    {l:'Extra Hours',  v:fmtHours(d.unplannedEst),c:'amber',s:'Added later'},
+    {l:'Original Est.',v:fmtHours(plEstV),c:'blue', s:'Planned workload'},
+    {l:'Total Logged', v:fmtHours(plLogV),c:'green',s:'Actual work done'},
+    {l:'Efficiency',   v:plUtil+'%',          c:'amber',s:'Log vs estimate'},
+    {l:'Extra Hours',  v:fmtHours(uEst),c:'amber',s:'Added later'},
     {l:'Days Left',    v:rem+'D',             c:'coral',s:'To sprint end'},
     {l:'Unplanned',    v:d.unplannedCount+'', c:'coral',s:'Tasks added'}
   ];
@@ -2187,7 +2254,7 @@ function doOverview(d){
   if(sgEl) sgEl.innerHTML=sg.map(function(x){
     return '<div class="nv-sg"><div class="l">'+x.l+'</div><div class="v '+x.c+'">'+x.v+'</div><div class="s">'+x.s+'</div></div>';
   }).join('');
-  nvStatusPill(document.getElementById('ovStatusPill'), d.compRate);
+  nvStatusPill(document.getElementById('ovStatusPill'), m.compRate);
 
   // Bugs & Polish donut
   var nb=(d.bugs||[]).length, np=(d.polish||[]).length;
@@ -5617,3 +5684,4 @@ document.getElementById('pdfBtn').addEventListener('click', openPdfModal);
 </script>
 </body>
 </html>
+
