@@ -709,11 +709,17 @@ select{background:var(--sur);color:var(--text);border:0.5px solid var(--bor);bor
 .nv-card{background:var(--sur);border:1px solid var(--bor);border-radius:12px;position:relative}
 .nv-ov-card{height:260px;padding:0;overflow:hidden}
 .nv-hd{position:absolute;top:16px;left:17px;right:17px;display:flex;align-items:center;justify-content:space-between;gap:8px;z-index:2}
-/* Bugs & polish filter — single toggle button, sits under the card title */
-.nv-hd{align-items:flex-start}
-.nv-hd-l{display:flex;flex-direction:column;align-items:flex-start;gap:7px;min-width:0}
-.nv-bp-tog{appearance:none;font-family:var(--font-body);font-size:11.5px;font-weight:600;letter-spacing:.01em;color:#8f9dff;background:rgba(91,110,245,.13);border:1px solid rgba(91,110,245,.45);padding:5px 12px;border-radius:7px;cursor:pointer;white-space:nowrap;display:inline-flex;align-items:center;gap:6px;transition:background .15s,border-color .15s}
-.nv-bp-tog::before{content:'';width:6px;height:6px;border-radius:50%;background:#5b6ef5}
+/* Bugs & polish filter — single toggle button, now lives in the Overview toolbar */
+.nv-hd-l{display:flex;align-items:center;gap:7px;min-width:0}
+/* Overview toolbar — holds the counting-mode toggle above the KPI card row */
+.nv-ov-bar{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;background:var(--sur);border:1px solid var(--bor);border-radius:12px;padding:11px 16px;margin-bottom:12px}
+.nv-ov-bar-l{display:flex;flex-direction:column;gap:2px;min-width:0}
+.nv-ov-bar-t{font-family:var(--font-display);font-weight:700;font-size:13px;color:var(--text);letter-spacing:-.01em}
+.nv-ov-bar-s{font-size:11px;color:var(--mut)}
+.nv-ov-bar-r{display:flex;align-items:center;gap:9px;flex-shrink:0}
+@media(max-width:620px){.nv-ov-bar{align-items:flex-start;flex-direction:column}}
+.nv-bp-tog{appearance:none;font-family:var(--font-body);font-size:12.5px;font-weight:600;letter-spacing:.01em;color:#8f9dff;background:rgba(91,110,245,.13);border:1px solid rgba(91,110,245,.45);padding:7px 15px;border-radius:8px;cursor:pointer;white-space:nowrap;display:inline-flex;align-items:center;gap:7px;transition:background .15s,border-color .15s}
+.nv-bp-tog::before{content:'';width:7px;height:7px;border-radius:50%;background:#5b6ef5}
 .nv-bp-tog:hover{background:rgba(91,110,245,.2);border-color:rgba(91,110,245,.65)}
 .nv-card-t{font-family:var(--font-display);font-weight:700;font-size:13px;color:var(--text);letter-spacing:-.01em}
 .nv-pill{font-family:var(--font-body);font-weight:600;font-size:11px;padding:5px 10px;border-radius:20px;display:inline-flex;align-items:center;white-space:nowrap}
@@ -754,7 +760,8 @@ select{background:var(--sur);color:var(--text);border:0.5px solid var(--bor);bor
 .nv-mh-foot{position:absolute;bottom:16px;left:0;right:0;display:flex;justify-content:center}
 .nv-mh-empty{position:absolute;top:54%;left:0;right:0;transform:translateY(-50%);text-align:center;font-size:11px;color:var(--mut);padding:0 16px}
 /* info row (burndown + sprint progress) */
-.nv-ov-info{display:grid;grid-template-columns:1.25fr 1fr;gap:12px;align-items:start}
+.nv-ov-info{display:grid;grid-template-columns:1.25fr 1fr;gap:12px;align-items:stretch}
+.nv-ov-info>.cc{margin-bottom:0}
 @media(max-width:1100px){.nv-ov-info{grid-template-columns:1fr}}
 .nv-goal{margin-top:12px}
 /* top tab row (demo design) */
@@ -1365,6 +1372,12 @@ function process(json,spId){
   // Snapshot the task-only figures BEFORE bugs/polish are folded in, so the
   // Overview cards can be shown with or without them (see d.exBP below).
   var _preBP = { totEst:totEst, totLog:totLog, done:done, prog:prog, ns:ns, ovd:ovd };
+  // Per-person task-only snapshot, so Expected Hours / Alerts can divide by the
+  // right estimate when the Overview is switched to "Tasks only".
+  var _preBPAsn = {};
+  Object.keys(amap).forEach(function(k){
+    _preBPAsn[k] = {est:amap[k].est||0, log:amap[k].log||0, tot:amap[k].tot||0, done:amap[k].done||0};
+  });
   bugsAndPolish.forEach(function(b){
     var est = parseFloat(b.estTime) || 0;
     var log = parseFloat(b.timeLog) || 0;
@@ -1439,6 +1452,8 @@ leaveRecords.forEach(function(leave){
 
   person.log += hours;
   person.leaveHours = (person.leaveHours || 0) + hours;
+  // Leave is credit for the person, not for bugs/polish — it applies in both modes.
+  if(_preBPAsn[matchedName]) _preBPAsn[matchedName].log += hours;
   totLog += hours;
 
   if(team){
@@ -1466,6 +1481,15 @@ leaveRecords.forEach(function(leave){
   Object.values(amap).forEach(function(a){
     a.avg=a.times.length?rnd(a.times.reduce(function(s,v){return s+v;},0)/a.times.length):0;
     a.est=rnd(a.est); a.log=rnd(a.log);
+  });
+
+  // Task-only mirror per person (bugs + polish excluded, leave credit kept).
+  Object.keys(amap).forEach(function(k){
+    var s = _preBPAsn[k] || {est:0, log:0, tot:0, done:0};
+    amap[k].estEx  = rnd(s.est);
+    amap[k].logEx  = rnd(s.log);
+    amap[k].totEx  = s.tot;
+    amap[k].doneEx = s.done;
   });
 
   var deptMap = {};
@@ -1997,13 +2021,19 @@ function shell(){
   /* OVERVIEW */
   +'<div class="page active" id="page-overview" data-section-label="Overview">'
   /* ── Top row: completion donut · status grid · bugs donut · scope donut · missing hours ── */
+  +'<div class="nv-ov-bar">'
+  +  '<span class="nv-ov-bar-l">'
+  +    '<span class="nv-ov-bar-t">Overview scope</span>'
+  +    '<span class="nv-ov-bar-s">Applies to Completion Rate, Status, Sprint progress, Burndown and Expected Hours</span>'
+  +  '</span>'
+  +  '<span class="nv-ov-bar-r">'
+  +    '<button type="button" class="nv-bp-tog" id="ovBpTog" onclick="nvSetBP()"></button>'
+  +  '</span>'
+  +'</div>'
   +'<div class="nv-ov-top">'
   +  '<div class="nv-card nv-ov-card">'
   +    '<div class="nv-hd">'
-  +      '<span class="nv-hd-l">'
-  +        '<span class="nv-card-t">Completion Rate</span>'
-  +        '<button type="button" class="nv-bp-tog" id="ovBpTog" onclick="nvSetBP()"></button>'
-  +      '</span>'
+  +      '<span class="nv-card-t">Completion Rate</span>'
   +      '<span class="nv-pill" id="ovCompPill"></span></div>'
   +    '<div class="nv-donut"><canvas id="crD"></canvas><div class="nv-donut-c" id="crDc"></div></div>'
   +    '<div class="nv-chips" id="ovCompChips"></div>'
@@ -2123,8 +2153,31 @@ function shell(){
 function nvDonut(id, data, colors, onSeg){
   var el=document.getElementById(id); if(!el) return null;
   if(CH[id]) CH[id].destroy();
+  var donutBorder=getComputedStyle(document.querySelector('.d')||document.documentElement).getPropertyValue('--sur').trim()||'#0b0c0f';
+  var donutSeparators={
+    id:'donutSeparators',
+    afterDatasetsDraw:function(chart){
+      var arcs=chart.getDatasetMeta(0).data;
+      var visible=arcs.filter(function(arc,i){return Number(data[i])>0;});
+      if(visible.length<2) return;
+      var ctx=chart.ctx;
+      ctx.save();
+      ctx.strokeStyle=donutBorder;
+      ctx.lineWidth=3;
+      ctx.lineCap='butt';
+      visible.forEach(function(arc){
+        var a=arc.startAngle;
+        ctx.beginPath();
+        ctx.moveTo(arc.x+Math.cos(a)*(arc.innerRadius-1),arc.y+Math.sin(a)*(arc.innerRadius-1));
+        ctx.lineTo(arc.x+Math.cos(a)*(arc.outerRadius+1),arc.y+Math.sin(a)*(arc.outerRadius+1));
+        ctx.stroke();
+      });
+      ctx.restore();
+    }
+  };
   CH[id]=new Chart(el,{type:'doughnut',
-    data:{datasets:[{data:data, backgroundColor:colors, borderWidth:0, spacing:2}]},
+    data:{datasets:[{data:data, backgroundColor:colors, borderWidth:0, spacing:0}]},
+    plugins:[donutSeparators],
     options:{cutout:'72%', responsive:true, maintainAspectRatio:false,
       onClick:function(evt,els){ if(onSeg && els && els.length) onSeg(els[0].index); },
       onHover:function(evt,els){ if(onSeg && evt.native) evt.native.target.style.cursor = els.length?'pointer':'default'; },
@@ -2158,11 +2211,17 @@ function completedSprintDaysForAlerts(d){
 // sprint's working days — not a flat 6h/day for everyone.
 //   dailyRate = est / dTot
 //   expected  = dailyRate * dDone   (dDone = fully elapsed working days)
+// When the Overview is on "Tasks only" the divisor becomes the person's
+// task-only estimate; "Incl. bugs & polish" keeps the merged estimate.
+function nvBPWithout(){ return window._bpMode === 'without'; }
+function nvAsnEst(a){ return (nvBPWithout() && a && a.estEx != null) ? (a.estEx || 0) : ((a && a.est) || 0); }
+function nvAsnLog(a){ return (nvBPWithout() && a && a.logEx != null) ? (a.logEx || 0) : ((a && a.log) || 0); }
+function nvAsnTot(a){ return (nvBPWithout() && a && a.totEx != null) ? (a.totEx || 0) : ((a && a.tot) || 0); }
 function personDailyRate(a, d){
   if(!a || !d) return 0;
   var days = d.dTot || 0;
   if(days <= 0) return 0;
-  return (a.est || 0) / days;
+  return nvAsnEst(a) / days;
 }
 function personExpected(a, d){
   return personDailyRate(a, d) * completedSprintDaysForAlerts(d);
@@ -2170,7 +2229,7 @@ function personExpected(a, d){
 // People with tasks but no estimate have no target to measure against —
 // leaving them in would show every logged hour as fake "surplus".
 function hasExpectedTarget(a){
-  return !!a && a.n !== 'Unassigned' && a.tot > 0 && (a.est || 0) > 0;
+  return !!a && a.n !== 'Unassigned' && nvAsnTot(a) > 0 && nvAsnEst(a) > 0;
 }
 function expectedHoursWaitingText(d){
   var start=pd(d&&d.startDate);
@@ -2188,9 +2247,11 @@ function nvStatusPill(el, rate){
   el.className='nv-pill '+s[0]; el.textContent=s[1];
 }
 /* Bugs & polish filter for the Overview cards.
-   'with'    → Completion Rate + Status include bugs and polishes (default)
+   'with'    → counts sprint tasks plus bugs and polishes (default)
    'without' → task-only figures, bugs and polishes excluded
-   Only these two cards change; the Bugs & Polishes card is unaffected. */
+   Affects: Completion Rate, Status, Sprint progress, Burndown, Expected Hours
+   and the sidebar Alerts (including every drill-down opened from them).
+   Scope Creep and the Bugs & Polishes card are deliberately unaffected. */
 window._bpMode = window._bpMode || 'with';
 /* Single toggle button. Called with no argument it flips the mode; the label
    always shows what is CURRENTLY being counted. */
@@ -2198,7 +2259,11 @@ function nvSetBP(mode){
   if(mode === 'with' || mode === 'without') window._bpMode = mode;
   else window._bpMode = (window._bpMode === 'without') ? 'with' : 'without';
   nvPaintBP();
-  if(window._sprintData) doOverview(window._sprintData);
+  if(window._sprintData){
+    doOverview(window._sprintData);
+    // Alerts share the expected-hours rule, so they follow the same mode.
+    if(typeof doSidebarAlerts === 'function') doSidebarAlerts(window._sprintData);
+  }
 }
 /* Paints the button to match the active mode. Also called after each render,
    since shell() rebuilds the button empty. */
@@ -2217,8 +2282,9 @@ function doOverview(d){
 
   nvPaintBP();   // shell() rebuilds the button empty — restore its label/state
 
-  // Bugs & polish filter — affects the Completion Rate + Status cards only.
-  // 'with' uses the merged totals; 'without' uses the task-only mirror (d.exBP).
+  // Bugs & polish filter — 'with' uses the merged totals, 'without' uses the
+  // task-only mirror (d.exBP). Sprint progress / Burndown read window._bpMode
+  // themselves so their drill-downs stay in sync.
   var m = (window._bpMode === 'without' && d.exBP) ? d.exBP : d;
 
   // Completion donut (clickable: segment -> task list)
@@ -2301,7 +2367,7 @@ function doMissingHours(d){
   }
   var active=(d.assignees||[]).filter(hasExpectedTarget);
   var rows=active.map(function(a){
-    var supposed=personExpected(a, d), logged=a.log||0;
+    var supposed=personExpected(a, d), logged=nvAsnLog(a);
     return {n:a.n, supposed:rnd(supposed), logged:rnd(logged), miss:rnd(logged-supposed)};
   });
   var supposedTotal=rnd(rows.reduce(function(s,r){return s+r.supposed;},0));
@@ -2359,7 +2425,7 @@ function nvMissingHoursDetail(){
   var active=(d.assignees||[]).filter(hasExpectedTarget);
   var allRows=active.map(function(a){
     var supposed=personExpected(a, d);
-    var logged=a.log||0;
+    var logged=nvAsnLog(a);
     var miss=logged-supposed;
     return {n:a.n, team:a.team||'', rate:personDailyRate(a, d), supposed:supposed, logged:logged, miss:miss};
   });
@@ -2399,7 +2465,7 @@ function buildSidebarAlertRows(d){
   var active = (d && d.assignees ? d.assignees : []).filter(hasExpectedTarget);
   return active.map(function(a){
     var expected = personExpected(a, d);
-    var logged = Math.min(a.log || 0, expected);
+    var logged = Math.min(nvAsnLog(a), expected);
     var miss = logged - expected;
     return { n:a.n, team:a.team || '', rate:personDailyRate(a, d), expected:expected, logged:logged, miss:miss };
   }).filter(function(r){ return r.miss < 0; }).sort(function(x,y){ return x.miss - y.miss; });
@@ -2481,9 +2547,51 @@ function nvAllItems(d){
 function nvRawTaskItems(d){
   return ((d&&d.tasks)||[]).concat((d&&d.subtasks)||[], (d&&d.bugs)||[], (d&&d.polish)||[]);
 }
+/* Overview-only item builders. They mirror nvAllItems / nvRawTaskItems but drop
+   bugs + polish while the toggle is on "Tasks only", so every list opened from
+   an Overview card matches the numbers printed on that card. Other pages keep
+   using the unfiltered builders above. */
+function nvOvAllItems(d){
+  var list = nvAllItems(d);
+  if(!nvBPWithout()) return list;
+  var drop = {};
+  ((d&&d.bugs)||[]).concat((d&&d.polish)||[]).forEach(function(b){ drop[nvItemKey(b)] = true; });
+  return list.filter(function(t){ return !drop[nvItemKey(t)]; });
+}
+function nvOvRawTaskItems(d){
+  var list = ((d&&d.tasks)||[]).concat((d&&d.subtasks)||[]);
+  if(!nvBPWithout()) list = list.concat((d&&d.bugs)||[], (d&&d.polish)||[]);
+  return list;
+}
+function nvItemKey(t){
+  return [t&&(t.taskName||t.name)||'', t&&t.assignee||'', t&&t.status||'', t&&t.parentTask||''].join('|');
+}
+/* Team hours roll-up for the Sprint progress tiles. 'with' reuses the server
+   totals untouched; 'without' rebuilds them from tasks + subtasks only, then
+   re-adds credited leave (leave is personal credit, not bug/polish work). */
+function nvOvDeptLookup(d){
+  var lookup = {};
+  if(!nvBPWithout()){
+    ((d.rawDeptTotals&&d.rawDeptTotals.length?d.rawDeptTotals:d.deptTotals)||[]).forEach(function(x){ lookup[x.n] = x; });
+    return lookup;
+  }
+  ((d&&d.tasks)||[]).concat((d&&d.subtasks)||[]).forEach(function(t){
+    var team = String(t.teamCategory||t.team||'').trim();
+    if(!team) return;
+    if(!lookup[team]) lookup[team] = {n:team, est:0, log:0};
+    lookup[team].est += parseFloat(t.estTime!=null?t.estTime:t.est)||0;
+    lookup[team].log += parseFloat(t.timeLog!=null?t.timeLog:t.log)||0;
+  });
+  ((d&&d.appliedLeaves)||[]).forEach(function(l){
+    if(!l.team) return;
+    if(!lookup[l.team]) lookup[l.team] = {n:l.team, est:0, log:0};
+    lookup[l.team].log += l.hours||0;
+  });
+  return lookup;
+}
 function nvTeamTaskCounts(d){
   var counts = {};
-  nvRawTaskItems(d).forEach(function(t){
+  nvOvRawTaskItems(d).forEach(function(t){
     var team = (t.teamCategory||t.team||'').trim();
     if(!team) return;
     if(!counts[team]) counts[team] = {done:0,total:0};
@@ -2523,12 +2631,12 @@ function nvTaskRows(items){
 // ── per-chart detail openers (read live sprint data) ──
 function nvStatusDetail(kind){
   var d=window._sprintData; if(!d) return;
-  var items=nvAllItems(d), list, title;
+  var items=nvOvAllItems(d), list, title;
   if(kind==='done'){ list=items.filter(nvIsDone); title='Completed'; }
   else if(kind==='wip'){ list=items.filter(nvIsWip); title='In progress'; }
   else if(kind==='ovd'){ list=items.filter(function(t){return nvIsOverdue(t,d);}); title='Overdue'; }
   else { list=items.filter(function(t){return !nvIsDone(t)&&!nvIsWip(t);}); title='Not started'; }
-  nvDetail('Completion · '+title, list.length+' item(s)', nvTaskRows(list));
+  nvDetail('Completion · '+title, list.length+' item(s)'+(nvBPWithout()?' · tasks only':''), nvTaskRows(list));
 }
 function nvBugDetail(kind){
   var d=window._sprintData; if(!d) return;
@@ -2581,6 +2689,21 @@ function nvPersonDetail(name){
   var done=list.filter(nvIsDone).length;
   nvDetail(name, done+'/'+list.length+' done', nvTaskRows(list));
 }
+/* Sprint-progress tile click — same view as nvTeamDetail but honours the
+   Overview toggle. The Team page keeps calling nvTeamDetail() unfiltered. */
+function nvOvTeamDetail(name){
+  var d=window._sprintData; if(!d || !name) return;
+  var list = nvOvRawTaskItems(d).filter(function(t){ return (t.teamCategory||t.team||'') === name; });
+  var seen = {};
+  list = list.filter(function(t){
+    var key = nvItemKey(t);
+    if(seen[key]) return false;
+    seen[key] = true;
+    return true;
+  });
+  var done=list.filter(nvIsDone).length;
+  nvDetail(name+' — team progress', done+'/'+list.length+' done'+(nvBPWithout()?' · tasks only':''), nvTaskRows(list));
+}
 function nvTeamDetail(name){
   var d=window._sprintData; if(!d || !name) return;
   var list = nvRawTaskItems(d).filter(function(t){ return (t.teamCategory||t.team||'') === name; });
@@ -2598,6 +2721,8 @@ function nvTeamDetail(name){
 
 /* ── SPRINT PROGRESS (demo design): day badges + clickable dept tiles ── */
 function doSprintProgress(d){
+  // Mode-aware completion figure — drives the On/Off Track badge.
+  var m = (nvBPWithout() && d.exBP) ? d.exBP : d;
   var pct=d.dTot>0?Math.min(100,Math.round(d.dDone/d.dTot*100)):0;
   var rem=Math.max(0,d.dTot-d.dDone);
   var timePct=d.dTot>0?(d.dDone/d.dTot*100):0;
@@ -2612,7 +2737,7 @@ function doSprintProgress(d){
   if(b2){
     if(rem===0){ b2.style.display='none'; }
     else { b2.style.display='';
-      var onTrack = d.compRate >= (timePct-12);
+      var onTrack = m.compRate >= (timePct-12);
       b2.className='nv-pill '+(onTrack?'good':'bad'); b2.textContent=onTrack?'On Track':'Off Track';
     }
   }
@@ -2633,15 +2758,18 @@ function doSprintProgress(d){
   // clickable dept tiles
   var depts=document.getElementById('spDepts');
   if(depts){
-    var deptLookup = {};
-    ((d.rawDeptTotals&&d.rawDeptTotals.length?d.rawDeptTotals:d.deptTotals)||[]).forEach(function(x){ deptLookup[x.n] = x; });
+    var deptLookup = nvOvDeptLookup(d);
     var teamCountLookup = nvTeamTaskCounts(d);
-    depts.innerHTML=(d.teams||[]).map(function(t){
+    // In "Tasks only" mode a team whose sprint work was purely bugs/polish has
+    // nothing left to show, so it drops out of the tile row entirely.
+    var teamList = (d.teams||[]);
+    if(nvBPWithout()) teamList = teamList.filter(function(t){ return !!teamCountLookup[t.n]; });
+    depts.innerHTML=teamList.map(function(t){
       var roll = deptLookup[t.n] || {est:0,log:0};
-      var counts = teamCountLookup[t.n] || {done:t.done||0,total:t.tot||0};
+      var counts = teamCountLookup[t.n] || {done:0,total:0};
       var tp=pc(counts.done,counts.total);
       var col=tp>=80?'var(--grn)':(tp>=50?'var(--amb)':'var(--red)');
-      return '<div class="nv-dept" onclick="nvTeamDetail(\''+escAttr(t.n)+'\')" title="Click to see '+escAttr(t.n)+' tasks">'
+      return '<div class="nv-dept" onclick="nvOvTeamDetail(\''+escAttr(t.n)+'\')" title="Click to see '+escAttr(t.n)+' tasks">'
         +'<div class="top"><span class="nm">'+escHtml(t.n)+'</span><span class="pc" style="color:'+col+'">'+tp+'%</span></div>'
         +'<div class="tr"><i style="width:'+tp+'%;background:'+col+'"></i></div>'
         +'<div class="mt">'+counts.done+'/'+counts.total+' done · '+rnd(roll.log||0)+'/'+rnd(roll.est||0)+' hrs</div></div>';
@@ -2917,6 +3045,12 @@ function doBurn(d){
   if(CH.b)CH.b.destroy();
   var c=cc();
 
+  // Bugs & polish filter — the burndown measures the same body of work the
+  // Completion Rate card is showing, so it reads the same mirror.
+  var m = (nvBPWithout() && d.exBP) ? d.exBP : d;
+  var burnEst = m.totEst || 0;
+  var burnLog = m.totLog || 0;
+
   // ── Capacity-based burndown ──
   // Calculate total team capacity: sum of daily hours of active members in this sprint
   var activeAsns = (d.assignees||[]).filter(function(a){return a.n !== 'Unassigned' && a.tot > 0;});
@@ -2949,8 +3083,20 @@ function doBurn(d){
     // Ideal remaining at start of Di = totEst - (capacity * (i))
     // But for D0, no capacity used yet.
     var capacityUsed = i === 0 ? 0 : totalDailyCapacity * i;
-    var remaining = Math.max(0, d.totEst - capacityUsed);
+    var remaining = Math.max(0, burnEst - capacityUsed);
     idealData.push(rnd(remaining));
+  }
+
+  // Actual remaining — rebuilt here (rather than reusing d.bA) so it tracks the
+  // active mode. Same rule as process(): flat across D0, then burn down by the
+  // average hours logged per completed working day.
+  var burnDone  = d.dDone || 0;
+  var burnLogPD = burnDone > 0 ? burnLog / burnDone : 0;
+  var actualData = [];
+  for(var k = 0; k < d.bL.length; k++){
+    if(k === 0) actualData.push(rnd(burnEst));
+    else if(k <= burnDone + 1) actualData.push(Math.max(0, rnd(burnEst - burnLogPD * (k - 1))));
+    else actualData.push(null);
   }
 
   // Info text
@@ -2960,13 +3106,14 @@ function doBurn(d){
     if(membersWithoutCapacity.length){
       infoTxt += '<br><span style="color:var(--amb)">Note: '+membersWithoutCapacity.length+' member(s) using default 6 hrs/day — set their hours in Users page.</span>';
     }
-    infoTxt += '<br><span style="color:var(--mut)">Total estimated work: '+d.totEst+' hrs · Total logged: '+d.totLog+' hrs</span>';
+    infoTxt += '<br><span style="color:var(--mut)">Total estimated work: '+rnd(burnEst)+' hrs · Total logged: '+rnd(burnLog)+' hrs'
+      + (nvBPWithout() ? ' · sprint tasks only (bugs &amp; polishes excluded)' : ' · incl. bugs &amp; polishes') + '</span>';
     infoEl.innerHTML = infoTxt;
   }
 
   CH.b=new Chart(document.getElementById('bC'),{type:'line',data:{labels:d.bL,datasets:[
     {label:'Ideal (capacity-based)',  data:idealData, borderColor:'#5b6ef5',borderDash:[6,4],borderWidth:2,pointRadius:0,stepped:true,fill:false},
-    {label:'Actual remaining', data:d.bA, borderColor:'#f05252',backgroundColor:'rgba(240,82,82,.15)',fill:true,borderWidth:3,pointRadius:4,pointBackgroundColor:'#f05252',stepped:true}
+    {label:'Actual remaining', data:actualData, borderColor:'#f05252',backgroundColor:'rgba(240,82,82,.15)',fill:true,borderWidth:3,pointRadius:4,pointBackgroundColor:'#f05252',stepped:true}
   ]},options:{responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false},
     plugins:{legend:{display:false},tooltip:{callbacks:{
       label: function(ctx){
@@ -5684,4 +5831,3 @@ document.getElementById('pdfBtn').addEventListener('click', openPdfModal);
 </script>
 </body>
 </html>
-
